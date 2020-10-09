@@ -9,6 +9,7 @@ COPY Cargo.lock /Cargo.lock
 COPY hawkeye-api /hawkeye-api
 COPY hawkeye-core /hawkeye-core
 COPY hawkeye-worker /hawkeye-worker
+COPY resources /resources
 RUN cargo build --release --package hawkeye-worker
 
 FROM ubuntu:18.04 AS app
