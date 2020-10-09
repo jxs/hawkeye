@@ -15,6 +15,7 @@ use log::{debug, info};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Sender;
 use std::sync::Arc;
+use std::io::Cursor;
 
 lazy_static! {
     pub(crate) static ref LATEST_FRAME: CowCell<Option<Vec<u8>>> = CowCell::new(None);
@@ -61,6 +62,10 @@ pub fn create_pipeline(
             return Err(color_eyre::eyre::eyre!("Container ({:?}) and Codec ({:?}) not available", container, codec));
         }
     };
+
+    let black_image = include_bytes!("../../resources/black_120px.jpg");
+    let mut black_image = Cursor::new(black_image.to_vec());
+    let black_detector = SlateDetector::new(&mut black_image)?;
 
     // Create our pipeline from a pipeline description string.
     debug!("Creating GStreamer Pipeline..");
@@ -115,7 +120,12 @@ pub fn create_pipeline(
                 // Prevents reading twice.
                 let local_buffer = buffer.to_vec();
 
-                let is_match = detector.is_match(local_buffer.as_slice());
+                let is_black = black_detector.is_match(local_buffer.as_slice());
+
+                let mut is_match = false;
+                if !is_black {
+                    is_match = detector.is_match(local_buffer.as_slice());
+                }
 
                 {
                     // Save latest image bytes
@@ -123,6 +133,10 @@ pub fn create_pipeline(
                     // Moves the local buffer
                     *write_txn = Some(local_buffer);
                     write_txn.commit();
+                }
+
+                if is_black {
+                    return Ok(gst::FlowSuccess::Ok);
                 }
 
                 if is_match {
