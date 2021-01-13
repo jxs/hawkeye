@@ -17,6 +17,9 @@ paths:
           description: Successfull response.
           content:
             application/json:
+              examples:
+                simple:
+                  $ref: '#/components/examples/ListWatchers'
               schema:
                 type: array
                 items:
@@ -27,6 +30,9 @@ paths:
       requestBody:
         content:
           application/json:
+            examples:
+              basic:
+                $ref: '#/components/examples/CreationPayload'
             schema:
               $ref: '#/components/schemas/WatcherBase'
       responses:
@@ -48,6 +54,9 @@ paths:
           description: Successfull response.
           content:
             application/json:
+              examples:
+                basic:
+                  $ref: '#/components/examples/SingleWatcherResult'
               schema:
                 $ref: '#/components/schemas/WatcherFull'
     delete:
@@ -247,3 +256,195 @@ components:
             timeout:
               type: number
               description: Timeout in seconds for the HTTP request to execute.
+
+  examples:
+
+    ListWatchers:
+      description: A list of Wachers as it is returned by the API.
+      value:
+        [
+          {
+            "id": "ad128d51-9a1c-407d-9edb-d590eb9c3d74",
+            "description": "Test watcher",
+            "slate_url": "https://github.com/cbsinteractive/hawkeye/raw/master/resources/slate_120px.jpg",
+            "source": {
+              "ingest_port": 5000,
+              "container": "raw-video",
+              "codec": "h264",
+              "transport": {
+                "protocol": "rtp"
+              }
+            },
+            "status": "ready",
+            "transitions": [
+              {
+                "from": "content",
+                "to": "slate",
+                "actions": [
+                  {
+                    "description": "Trigger AdBreak using API",
+                    "type": "http_call",
+                    "method": "POST",
+                    "retries": 3,
+                    "timeout": 10,
+                    "url": "http://api.example.com/v1/organization/cbsa6fhh/channel/slate4g85/ad-break",
+                    "authorization": {
+                      "basic": {
+                        "username": "myusername",
+                        "password": "somepassword"
+                      }
+                    },
+                    "headers": {
+                      "Content-Type": "application/json"
+                    },
+                    "body": "{\"duration\":300}"
+                  }
+                ]
+              },
+              {
+                "from": "slate",
+                "to": "content",
+                "actions": [
+                  {
+                    "description": "Use dump out of AdBreak API call",
+                    "type": "http_call",
+                    "method": "DELETE",
+                    "timeout": 10,
+                    "url": "http://api.example.com/v1/organization/cbsa6fhh/channel/slate4g85/ad-break",
+                    "authorization": {
+                      "basic": {
+                        "username": "myusername",
+                        "password": "somepassword"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+
+    SingleWatcherResult:
+      description: Watcher that is returned by the API.
+      value:
+        {
+          "id": "ad128d51-9a1c-407d-9edb-d590eb9c3d74",
+          "description": "Test watcher",
+          "slate_url": "https://github.com/cbsinteractive/hawkeye/raw/master/resources/slate_120px.jpg",
+          "source": {
+            "ingest_port": 5000,
+            "container": "raw-video",
+            "codec": "h264",
+            "transport": {
+              "protocol": "rtp"
+            }
+          },
+          "status": "ready",
+          "transitions": [
+            {
+              "from": "content",
+              "to": "slate",
+              "actions": [
+                {
+                  "description": "Trigger AdBreak using API",
+                  "type": "http_call",
+                  "method": "POST",
+                  "retries": 3,
+                  "timeout": 10,
+                  "url": "http://api.example.com/v1/organization/cbsa6fhh/channel/slate4g85/ad-break",
+                  "authorization": {
+                    "basic": {
+                      "username": "myusername",
+                      "password": "somepassword"
+                    }
+                  },
+                  "headers": {
+                    "Content-Type": "application/json"
+                  },
+                  "body": "{\"duration\":300}"
+                }
+              ]
+            },
+            {
+              "from": "slate",
+              "to": "content",
+              "actions": [
+                {
+                  "description": "Use dump out of AdBreak API call",
+                  "type": "http_call",
+                  "method": "DELETE",
+                  "timeout": 10,
+                  "url": "http://api.example.com/v1/organization/cbsa6fhh/channel/slate4g85/ad-break",
+                  "authorization": {
+                    "basic": {
+                      "username": "myusername",
+                      "password": "somepassword"
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        }
+
+    CreationPayload:
+      description: A valid JSON payload that can be used to create a Watcher.
+      value:
+        {
+          "description": "Test watcher",
+          "slate_url": "https://github.com/cbsinteractive/hawkeye/raw/master/resources/slate_120px.jpg",
+          "source": {
+            "ingest_port": 5000,
+            "container": "raw-video",
+            "codec": "h264",
+            "transport": {
+              "protocol": "rtp"
+            }
+          },
+          "transitions": [
+            {
+              "from": "content",
+              "to": "slate",
+              "actions": [
+                {
+                  "description": "Trigger AdBreak using API",
+                  "type": "http_call",
+                  "method": "POST",
+                  "retries": 3,
+                  "timeout": 10,
+                  "url": "http://api.example.com/v1/organization/cbsa6fhh/channel/slate4g85/ad-break",
+                  "authorization": {
+                    "basic": {
+                      "username": "myusername",
+                      "password": "somepassword"
+                    }
+                  },
+                  "headers": {
+                    "Content-Type": "application/json"
+                  },
+                  "body": "{\"duration\":300}"
+                }
+              ]
+            },
+            {
+              "from": "slate",
+              "to": "content",
+              "actions": [
+                {
+                  "description": "Use dump out of AdBreak API call",
+                  "type": "http_call",
+                  "method": "DELETE",
+                  "timeout": 10,
+                  "url": "http://api.example.com/v1/organization/cbsa6fhh/channel/slate4g85/ad-break",
+                  "authorization": {
+                    "basic": {
+                      "username": "myusername",
+                      "password": "somepassword"
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        }
+
