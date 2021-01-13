@@ -149,6 +149,13 @@ components:
             status_description:
               type: string
               description: A more detailed description of the status of the Watcher.
+            source:
+              type: object
+              properties:
+                ingest_ip:
+                  type: string
+                  format: uri
+                  example: dc401bafb-15a.elb.us-east-1.amazonaws.com
         - $ref: '#/components/schemas/WatcherBase'
 
     WatcherBase:
@@ -268,6 +275,7 @@ components:
             "description": "Test watcher",
             "slate_url": "https://github.com/cbsinteractive/hawkeye/raw/master/resources/slate_120px.jpg",
             "source": {
+              "ingest_ip": "uniqueservername.example.com",
               "ingest_port": 5000,
               "container": "raw-video",
               "codec": "h264",
@@ -332,6 +340,7 @@ components:
           "description": "Test watcher",
           "slate_url": "https://github.com/cbsinteractive/hawkeye/raw/master/resources/slate_120px.jpg",
           "source": {
+            "ingest_ip": "uniqueservername.example.com",
             "ingest_port": 5000,
             "container": "raw-video",
             "codec": "h264",
