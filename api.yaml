@@ -1,0 +1,249 @@
+openapi: 3.0.3
+info:
+  title: Hawkeye
+  description: Hawkeye
+  version: 1.0.0
+  license:
+    name: MIT
+servers:
+  - url: 'https'
+paths:
+  "/v1/watchers":
+    get:
+      summary: List all watchers.
+      operationId: handlers::watchers_list
+      responses:
+        "200":
+          description: Successfull response.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/WatcherFull'
+    post:
+      summary: Create a new Watcher.
+      operationId: handlers::create_watcher
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WatcherBase'
+      responses:
+        "201":
+          description: Successfull response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WatcherFull'
+
+  "/v1/watchers/{watcher_id}":
+    parameters:
+      - $ref: '#/components/parameters/WatcherIdPath'
+    get:
+      summary: Get a specific Watcher.
+      operationId: handlers::get_watcher
+      responses:
+        "200":
+          description: Successfull response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WatcherFull'
+    delete:
+      summary: Delete a specific Watcher.
+      operationId: handlers::delete_watcher
+      responses:
+        "200":
+          description: Successfull executed operation.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                properties:
+                  message:
+                    type: string
+                    description: Description of successfull operation.
+
+  "/v1/watchers/{watcher_id}/start":
+    parameters:
+      - $ref: '#/components/parameters/WatcherIdPath'
+    post:
+      summary: Start running the Watcher.
+      operationId: handlers::start_watcher
+      responses:
+        "200":
+          description: Watcher is starting.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                properties:
+                  message:
+                    type: string
+                    description: Description of successfull operation.
+
+
+  "/v1/watchers/{watcher_id}/stop":
+    parameters:
+      - $ref: '#/components/parameters/WatcherIdPath'
+    post:
+      summary: Stop the Watcher.
+      operationId: handlers::stop_watcher
+      responses:
+        "200":
+          description: Watcher is stopping.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                properties:
+                  message:
+                    type: string
+                    description: Description of successfull operation.
+
+components:
+
+  parameters:
+    WatcherIdPath:
+      name: watcher_id
+      in: path
+      description: The Watcher ID.
+      required: true
+      allowEmptyValue: false
+      schema:
+        type: string
+
+  schemas:
+    WatcherFull:
+      allOf:
+        - type: object
+          required:
+            - id
+          properties:
+            id:
+              type: string
+              description: Unique identifier for the watcher.
+            status:
+              type: string
+              enum:
+                - ready
+                - running
+                - pending
+                - error
+            status_description:
+              type: string
+              description: A more detailed description of the status of the Watcher.
+        - $ref: '#/components/schemas/WatcherBase'
+
+    WatcherBase:
+      type: object
+      required:
+        - slate_url
+        - source
+        - transitions
+      properties:
+        description:
+          type: string
+          description: A human readable description of the watcher.
+        slate_url:
+            type: string
+            format: uri
+            description: The slate image url, needs to be publicly accessible.
+        source:
+          type: object
+          description: Sepecify the video source configurations.
+          properties:
+            codec:
+              type: string
+              enum:
+                - h264
+            container:
+              type: string
+              enum:
+                - mpeg-ts
+                - raw_video
+            ingest_port:
+              type: number
+              description: Port to be used by the server to receive the video feed.
+            transport:
+              type: object
+              properties:
+                protocol:
+                  type: string
+                  enum:
+                    - rtp
+                  description: Protocol the watcher is expecting to receive the video feed.
+        transitions:
+          type: array
+          items:
+            type: object
+            properties:
+              actions:
+                type: array
+                items:
+                  oneOf:
+                    - $ref: '#/components/schemas/HttpCallAction'
+              from:
+                type: string
+                enum:
+                  - content
+                  - slate
+              to:
+                type: string
+                enum:
+                  - content
+                  - slate
+
+    Action:
+      type: object
+      properties:
+        description:
+          type: string
+          description: Description of the action.
+
+    HttpCallAction:
+      allOf:
+        - $ref: '#/components/schemas/Action'
+        - type: object
+          properties:
+            type:
+              type: string
+              enum:
+                - http_call
+            authorization:
+              type: object
+              properties:
+                basic:
+                  type: object
+                  properties:
+                    username:
+                      type: string
+                    password:
+                      type: string
+            body:
+              type: string
+              description: Body of the request to be used.
+            headers:
+              type: object
+              description: Key value pair of headers the action HTTP call should use.
+            method:
+              type: string
+              enum:
+                - POST
+                - GET
+                - PUT
+                - PATCH
+                - DELETE
+            retires:
+              type: number
+              description: Number of times the action should be retried.
+            timeout:
+              type: number
+              description: Timeout in seconds for the HTTP request to execute.
