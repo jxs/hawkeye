@@ -4,18 +4,19 @@ use color_eyre::Result;
 use image::imageops::FilterType;
 use image::ImageFormat;
 use log::debug;
+use rand::distributions::Alphanumeric;
+use rand::{thread_rng, Rng};
 use std::convert::{TryFrom, TryInto};
 use std::fs::File;
-use std::io::{Cursor, Read, Write};
+use std::io::{Read, Write};
 use std::path::Path;
-use std::process;
 use std::time::Duration;
 
 pub const SLATE_SIZE: (u32, u32) = (213, 120);
 const MEGABYTES: usize = 1024 * 1024;
 const VIDEO_FILE_EXTENSIONS: [&str; 2] = ["mp4", "mkv"];
 
-pub fn load_img(url: &str) -> Result<Box<dyn Read>> {
+pub fn load_img(url: &str) -> Result<Vec<u8>> {
     let temp_file: TempFile = Url::new(url).try_into()?;
 
     let contents = if temp_file.is_video() {
@@ -25,11 +26,11 @@ pub fn load_img(url: &str) -> Result<Box<dyn Read>> {
         let path = temp_file.full_path();
         debug!("Loading slate image from file: {}", path);
         let img = image::open(path.as_str())
-            .wrap_err("Could not open image")?
+            .wrap_err("Failed to open image")?
             .resize_exact(SLATE_SIZE.0, SLATE_SIZE.1, FilterType::Triangle);
         let mut contents = Vec::new();
         img.write_to(&mut contents, ImageFormat::Png)
-            .wrap_err("Could not write to temp file")?;
+            .wrap_err("Failed to write to temp file")?;
         contents
     };
 
@@ -39,7 +40,7 @@ pub fn load_img(url: &str) -> Result<Box<dyn Read>> {
         debug!("Wrote to debug file: {}", f.full_path())
     }
 
-    Ok(Box::new(Cursor::new(contents)))
+    Ok(contents)
 }
 
 pub trait FileLike {
@@ -49,7 +50,7 @@ pub trait FileLike {
         Ok(String::from(
             Path::new(self.full_path().as_str())
                 .extension()
-                .ok_or(color_eyre::eyre::eyre!("File does not have extension"))?
+                .ok_or_else(|| color_eyre::eyre::eyre!("File does not have extension"))?
                 .to_str()
                 .unwrap(),
         ))
@@ -87,14 +88,14 @@ impl TempFile {
     pub fn new<S: AsRef<str>, T: AsRef<str>>(name: S, ext: T) -> Result<Self> {
         let path = Self::file_path(name.as_ref(), ext.as_ref());
         Ok(Self {
-            file: File::create(path.as_str()).wrap_err("Could not create temp file")?,
+            file: File::create(path.as_str()).wrap_err("Failed to create temp file")?,
             path,
         })
     }
 
     pub fn from_original<S: AsRef<str>>(full_path: S) -> Result<Self> {
         Ok(Self {
-            file: File::open(full_path.as_ref()).wrap_err("Could not open provided path")?,
+            file: File::open(full_path.as_ref()).wrap_err("Failed open provided path")?,
             path: String::from(full_path.as_ref()),
         })
     }
@@ -102,14 +103,14 @@ impl TempFile {
     fn is_video(&self) -> bool {
         VIDEO_FILE_EXTENSIONS
             .iter()
-            .any(|v| v.to_string() == self.extension().unwrap_or_else(|_| String::new()))
+            .any(|v| *v == self.extension().unwrap_or_else(|_| String::new()))
     }
 
     fn write_all<R: Read>(&mut self, mut reader: R) -> Result<()> {
         let mut buffer = Vec::with_capacity(5 * MEGABYTES);
         loop {
             let p = reader.read_to_end(&mut buffer)?;
-            self.file.write(buffer.as_slice())?;
+            self.file.write_all(buffer.as_slice())?;
             buffer.clear();
             if p == 0 {
                 break;
@@ -119,7 +120,12 @@ impl TempFile {
     }
 
     fn file_path(name: &str, ext: &str) -> String {
-        format!("/tmp/hwk_{}_{}.{}", process::id(), name, ext)
+        let rand_string: String = thread_rng()
+            .sample_iter(&Alphanumeric)
+            .take(10)
+            .map(char::from)
+            .collect();
+        format!("/tmp/hwk_{}_{}.{}", rand_string, name, ext)
     }
 }
 
@@ -176,7 +182,10 @@ impl FrameCapture {
             self.frame_size.1
         );
         for frame in VideoStream::new(pipeline) {
-            return Ok(frame?);
+            match frame? {
+                Some(contents) => return Ok(contents),
+                None => continue,
+            }
         }
         Err(color_eyre::eyre::eyre!("Failed to capture video frame"))
     }

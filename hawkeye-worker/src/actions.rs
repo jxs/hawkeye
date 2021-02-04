@@ -4,9 +4,9 @@ use crate::metrics::{
 };
 use crate::video_stream::Event;
 use color_eyre::Result;
+use crossbeam::channel::Receiver;
 use hawkeye_core::models::{self, Action, HttpAuth, HttpCall, VideoMode};
 use log::{debug, error, info, warn};
-use std::sync::mpsc::Receiver;
 use std::time::Duration;
 
 #[cfg(test)]
@@ -209,12 +209,12 @@ fn try_call(call: &HttpCall) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crossbeam::channel::unbounded;
     use hawkeye_core::models::{FakeAction, HttpMethod};
     use mockito::{mock, server_url, Matcher};
     use sn_fake_clock::FakeClock;
     use std::collections::HashMap;
     use std::sync::atomic::{AtomicBool, Ordering};
-    use std::sync::mpsc::channel;
     use std::sync::Arc;
 
     fn sleep(d: Duration) {
@@ -329,7 +329,7 @@ mod tests {
         executor.execute(VideoMode::Content);
         assert_eq!(called.load(Ordering::SeqCst), false);
 
-        let (s, r) = channel();
+        let (s, r) = unbounded();
         // Pile up some events for the runtime to consume
         s.send(Event::Mode(VideoMode::Slate)).unwrap();
         s.send(Event::Terminate).unwrap();
