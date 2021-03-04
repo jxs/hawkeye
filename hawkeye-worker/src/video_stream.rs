@@ -1,7 +1,7 @@
 use crate::img_detector::SlateDetector;
 use crate::metrics::{
     FOUND_CONTENT_COUNTER, FOUND_SLATE_COUNTER, FRAME_PROCESSING_DURATION,
-    SIMILARITY_EXECUTION_COUNTER, SIMILARITY_EXECUTION_DURATION,
+    SIMILARITY_EXECUTION_COUNTER, SIMILARITY_EXECUTION_DURATION, TEXT_DETECTION_EXECUTION_DURATION
 };
 use crate::slate::SLATE_SIZE;
 use color_eyre::Result;
@@ -19,6 +19,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
+use image::{Rgb, ImageEncoder, ColorType};
+use image::png::PngEncoder;
 
 lazy_static! {
     pub(crate) static ref LATEST_FRAME: CowCell<Option<Vec<u8>>> = CowCell::new(None);
@@ -45,8 +47,12 @@ pub fn process_frames(
     running: Arc<AtomicBool>,
     action_sink: Sender<Event>,
 ) -> Result<()> {
-    let black_image = include_bytes!("../../resources/black_120px.jpg");
-    let black_detector = SlateDetector::new(black_image)?;
+    let black_image = image::ImageBuffer::<Rgb<u8>, Vec<u8>>::new(SLATE_SIZE.0, SLATE_SIZE.1);
+    let mut buffer = Vec::new();
+    PngEncoder::new(&mut buffer).write_image(black_image.as_raw(), SLATE_SIZE.0, SLATE_SIZE.1, ColorType::Rgb8)?;
+    let black_detector = SlateDetector::new(buffer.as_slice())?;
+
+    let mut text_extractor = leptess::LepTess::new(None, "eng").unwrap();
 
     let mut empty_iterations = 0;
     for frame in frame_source {
@@ -72,12 +78,34 @@ pub fn process_frames(
 
         let mut is_match = false;
         if !is_black {
+            let td = TEXT_DETECTION_EXECUTION_DURATION.start_timer();
+
+            text_extractor.set_image_from_mem(local_buffer.as_slice()).unwrap();
+            text_extractor.set_source_resolution(100);
+            let boxes = text_extractor.get_component_boxes(leptess::capi::TessPageIteratorLevel_RIL_WORD, false).unwrap();
+            for b in boxes {
+                text_extractor.set_rectangle(&b);
+                match text_extractor.get_utf8_text() {
+                    Ok(text) => {
+                        let confidence = text_extractor.mean_text_conf();
+                        if confidence >= 80 {
+                            log::info!("Detected text: {} - Confidence: {}", text, confidence);
+                        }
+                    },
+                    Err(err) => {
+                        log::error!("Error detecting text: {:?}", err);
+                    }
+                }
+            }
+            let took_in_seconds = td.stop_and_record();
+            log::info!("Text detection algorithm ran in {} seconds", took_in_seconds);
+
             let t = SIMILARITY_EXECUTION_DURATION.start_timer();
 
             is_match = detector.is_match(local_buffer.as_slice());
 
             let took_in_seconds = t.stop_and_record();
-            log::trace!("Similarity algorithm ran in {} seconds", took_in_seconds);
+            log::info!("Similarity algorithm ran in {} seconds", took_in_seconds);
         }
 
         {
@@ -104,7 +132,7 @@ pub fn process_frames(
         SIMILARITY_EXECUTION_COUNTER.inc();
 
         let took_in_seconds = frame_processing_timer.stop_and_record();
-        log::trace!("Frame processing took {} seconds", took_in_seconds);
+        log::info!("Frame processing took {} seconds", took_in_seconds);
         if !running.load(Ordering::SeqCst) {
             break;
         }

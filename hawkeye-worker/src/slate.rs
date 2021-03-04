@@ -12,7 +12,7 @@ use std::io::{Read, Write};
 use std::path::Path;
 use std::time::Duration;
 
-pub const SLATE_SIZE: (u32, u32) = (213, 120);
+pub const SLATE_SIZE: (u32, u32) = (426, 240);
 const MEGABYTES: usize = 1024 * 1024;
 const VIDEO_FILE_EXTENSIONS: [&str; 2] = ["mp4", "mkv"];
 

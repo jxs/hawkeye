@@ -30,6 +30,11 @@ lazy_static! {
         "Seconds it took to execute the similarity algorithm"
     )
     .unwrap();
+    pub static ref TEXT_DETECTION_EXECUTION_DURATION: Histogram = register_histogram!(
+        "text_detection_execution_seconds",
+        "Seconds it took to execute the text detection algorithm"
+    )
+    .unwrap();
     pub static ref FRAME_PROCESSING_DURATION: Histogram = register_histogram!(
         "frame_processing_seconds",
         "Seconds it took to execute the whole frame processing block"

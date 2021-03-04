@@ -92,4 +92,40 @@ mod test {
 
         assert_eq!(detector.is_match(frame_img.as_slice()), false);
     }
+
+    #[test]
+    fn extract_text_from_slate() {
+        // let buffer = {
+        //     let mut slate =
+        //         File::open("../resources/plutotv_slate.jpg").expect("Missing file in resources folder");
+        //     let mut b = Vec::new();
+        //     slate
+        //         .read_to_end(&mut b)
+        //         .expect("Failed to write to buffer");
+        //     b
+        // };
+
+        let mut text_extractor = leptess::LepTess::new(Some("/Users/rafael.caricio/development/live/tessdata_best"), "eng").unwrap();
+        //text_extractor.set_variable("tessedit_char_whitelist", "0123456789").unwrap();
+        //text_extractor.set_variable("classify_bln_numeric_mode", "1").unwrap();
+        //text_extractor.set_image_from_mem(buffer.as_slice()).unwrap();
+        text_extractor.set_image("../resources/plutotv_slate.jpg").unwrap();
+        text_extractor.set_source_resolution(70);
+        let boxes = text_extractor.get_component_boxes(leptess::capi::TessPageIteratorLevel_RIL_WORD, false).unwrap();
+        for b in boxes {
+            text_extractor.set_rectangle(&b);
+            //println!("Trying box: {:?}", b.get_val());
+            match text_extractor.get_utf8_text() {
+                Ok(text) => {
+                    let confidence = text_extractor.mean_text_conf();
+                    if confidence > 0 {
+                        println!("Detected text: {} - Confidence: {}", text.replace("\n", ""), confidence);
+                    }
+                },
+                Err(err) => {
+                    println!("Error detecting text: {:?}", err);
+                }
+            }
+        }
+    }
 }
