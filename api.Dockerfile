@@ -1,4 +1,12 @@
-FROM osig/rust-ubuntu:1.44.1 AS builder
+#
+# Build the executable artifacts to include in a final image.
+#
+FROM rust:1.57-slim-buster as builder
+
+RUN apt-get update -qq
+RUN apt-get install -yq \
+    pkg-config \
+    libssl-dev
 COPY Cargo.toml /Cargo.toml
 COPY Cargo.lock /Cargo.lock
 COPY hawkeye-api /hawkeye-api
@@ -7,12 +15,19 @@ COPY hawkeye-worker /hawkeye-worker
 COPY resources /resources
 RUN cargo build --release --package hawkeye-api
 
-FROM ubuntu:18.04 AS app
-RUN apt update \
-    && apt install -y \
-           libssl1.0.0 \
-           libssl-dev \
-    && apt-get clean
-ENV RUST_LOG=info
+#
+# Build the final image containing the built executables.
+#
+FROM debian:buster-slim as app
+
+# Make RUST_LOG configurable at buld time.
+# This may be overridden with `-e RUST_LOG=debug` at `docker run` time.
+ARG RUST_LOG=info
+ENV RUST_LOG ${RUST_LOG}
+
+RUN apt-get update -qq \
+    && apt-get install -yq \
+        libssl-dev
+
 COPY --from=builder /target/release/hawkeye-api .
 ENTRYPOINT ["/hawkeye-api"]
