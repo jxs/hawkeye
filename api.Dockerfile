@@ -26,7 +26,7 @@ ARG RUST_LOG=info
 ENV RUST_LOG ${RUST_LOG}
 
 RUN apt-get update -qq \
-    && apt-get install -yq \
+    && apt-get install -y \
         libssl-dev
 
 COPY --from=builder /target/release/hawkeye-api .

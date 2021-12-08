@@ -31,8 +31,8 @@ lazy_static! {
 }
 
 /// In case the environment variable `HAWKEYE_FIXED_TOKEN` is not present, a
-/// random token between 20 and 30 characters is generated. The random token is exposed in a log
-/// message for visibility.
+/// random token between 20 and 30 characters is generated. The random token is exposed
+/// in a log message for visibility.
 fn gen_token() -> String {
     let mut rng = thread_rng();
     let n: usize = rng.gen_range(20, 30);

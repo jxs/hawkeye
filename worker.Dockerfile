@@ -9,8 +9,6 @@ RUN apt install -y \
     libglib2.0-dev \
     libgstreamer1.0-dev \
     libgstreamer-plugins-base1.0-dev
-#              gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
-#              gstreamer1.0-plugins-bad gstreamer1.0-libav libgstrtspserver-1.0-dev libges-1.0-dev
 COPY Cargo.toml /Cargo.toml
 COPY Cargo.lock /Cargo.lock
 COPY hawkeye-api /hawkeye-api
@@ -19,23 +17,20 @@ COPY hawkeye-worker /hawkeye-worker
 COPY resources /resources
 RUN cargo build --release --package hawkeye-worker
 
-##
-## Build the final image containing the built executables.
-##
-#FROM debian:buster-slim as app
 #
-## Make RUST_LOG configurable at buld time.
-## This may be overridden with `-e RUST_LOG=debug` at `docker run` time.
-#ARG RUST_LOG=info
-#ENV RUST_LOG ${RUST_LOG}
+# Build the final image containing the built executables.
 #
-###RUN apt update \
-###    && apt install -y \
-###           gstreamer1.0-plugins-base \
-###           gstreamer1.0-plugins-good \
-###           gstreamer1.0-plugins-bad \
-###           gstreamer1.0-libav \
-###    && apt-get clean
-#
-#COPY --from=builder /target/release/hawkeye-worker .
-#ENTRYPOINT ["/hawkeye-worker"]
+FROM debian:buster-slim as app
+COPY resources /resources
+
+# Make RUST_LOG configurable at buld time.
+# This may be overridden with `-e RUST_LOG=debug` at `docker run` time.
+ENV RUST_LOG ${RUST_LOG}
+
+RUN apt update -qq \
+    && apt install -y \
+        libgstreamer-plugins-base1.0-dev \
+    && apt-get clean
+
+COPY --from=builder /target/release/hawkeye-worker .
+ENTRYPOINT ["/hawkeye-worker"]

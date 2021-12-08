@@ -168,7 +168,7 @@ pub fn build_service(watcher_id: &str, ingest_port: u32) -> Service {
             "annotations": {
                 // "external-dns.alpha.kubernetes.io/hostname": "",
                 "service.beta.kubernetes.io/aws-load-balancer-type": "nlb"
-            }
+            },
         },
         "spec": {
             "type": "LoadBalancer",

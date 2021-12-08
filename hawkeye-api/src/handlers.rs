@@ -4,7 +4,7 @@ use crate::templates::container_spec;
 use hawkeye_core::models::{Status, Watcher};
 use k8s_openapi::api::apps::v1::Deployment;
 use k8s_openapi::api::core::v1::{ConfigMap, Pod, Service};
-use kube::api::{DeleteParams, ListParams, PatchParams, PostParams};
+use kube::api::{DeleteParams, ListParams, Patch, PatchParams, PostParams};
 use kube::{Api, Client};
 use serde_json::json;
 use std::collections::HashMap;
@@ -21,7 +21,7 @@ pub async fn list_watchers(client: Client) -> Result<impl warp::Reply, Infallibl
         .labels("app=hawkeye,watcher_id")
         .timeout(10);
 
-    // Get all deployments we know, we want to return the status of each watcher
+    // Get all K8S deployments we know, we want to return the status of each watcher
     let deployments_client: Api<Deployment> = Api::namespaced(client.clone(), &NAMESPACE);
     let deployments = deployments_client.list(&lp).await.unwrap();
     let mut deployments_index = HashMap::new();
@@ -37,18 +37,18 @@ pub async fn list_watchers(client: Client) -> Result<impl warp::Reply, Infallibl
     let mut watchers: Vec<Watcher> = Vec::new();
     for config in config_maps.items {
         let data = config.data.unwrap();
-        let mut w: Watcher = serde_json::from_str(data.get("watcher.json").unwrap()).unwrap();
+        let mut watcher: Watcher = serde_json::from_str(data.get("watcher.json").unwrap()).unwrap();
         let calculated_status = if let Some(status) =
-            deployments_index.get(w.id.as_ref().unwrap_or(&"undefined".to_string()))
+            deployments_index.get(watcher.id.as_ref().unwrap_or(&"undefined".to_string()))
         {
             *status
         } else {
             Status::Error
         };
-        w.status = Some(calculated_status);
+        watcher.status = Some(calculated_status);
         // TODO: Comes from the service
-        w.source.ingest_ip = None;
-        watchers.push(w);
+        watcher.source.ingest_ip = None;
+        watchers.push(watcher);
     }
 
     Ok(warp::reply::json(&watchers))
@@ -153,7 +153,7 @@ pub async fn upgrade_watcher(id: String, client: Client) -> Result<impl warp::Re
         .patch(
             deployment.metadata.name.as_ref().unwrap(),
             &patch_params,
-            serde_json::to_vec(&spec_updated).unwrap(),
+            &Patch::Apply(spec_updated)
         )
         .await
     {
@@ -332,11 +332,13 @@ pub async fn get_video_frame(id: String, client: Client) -> Result<impl warp::Re
                 .error_for_status()
             {
                 Ok(image_response) => {
-                    let image_bytes = image_response.bytes().await.unwrap();
                     let headers = resp.headers_mut();
                     headers.insert(CONTENT_TYPE, HeaderValue::from_static("image/png"));
                     headers.insert(CACHE_CONTROL, HeaderValue::from_static("no-store"));
-                    *resp.body_mut() = Body::from(image_bytes);
+
+                    let image_bytes = image_response.bytes().await.unwrap();
+                    *resp.body_mut() = Body::from(image_bytes.to_vec());
+
                     return Ok(resp);
                 }
                 Err(_) => {
@@ -392,7 +394,7 @@ pub async fn start_watcher(id: String, client: Client) -> Result<impl warp::Repl
                 .patch_scale(
                     deployment.metadata.name.as_ref().unwrap(),
                     &patch_params,
-                    serde_json::to_vec(&fs).unwrap(),
+                  &Patch::Apply(fs),
                 )
                 .await
                 .unwrap();
@@ -409,7 +411,7 @@ pub async fn start_watcher(id: String, client: Client) -> Result<impl warp::Repl
                 .patch(
                     deployment.metadata.name.as_ref().unwrap(),
                     &patch_params,
-                    serde_json::to_vec(&status_label).unwrap(),
+                    &Patch::Apply(status_label),
                 )
                 .await;
 
@@ -469,7 +471,7 @@ pub async fn stop_watcher(id: String, client: Client) -> Result<impl warp::Reply
                 .patch_scale(
                     deployment.metadata.name.as_ref().unwrap(),
                     &patch_params,
-                    serde_json::to_vec(&fs).unwrap(),
+                    &Patch::Apply(fs),
                 )
                 .await
                 .unwrap();
@@ -486,7 +488,7 @@ pub async fn stop_watcher(id: String, client: Client) -> Result<impl warp::Reply
                 .patch(
                     deployment.metadata.name.as_ref().unwrap(),
                     &patch_params,
-                    serde_json::to_vec(&status_label).unwrap(),
+                    &Patch::Apply(status_label),
                 )
                 .await;
 

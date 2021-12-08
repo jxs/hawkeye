@@ -11,32 +11,70 @@ video feed.
 
 ## Running locally
 
-The worker can be run independently with Docker or directly on the host machine.
+The full Hawkeye application consists of a REST API that manages Workers, Workers
+that watch a stream for slates of interest to fire actions, and all the state services
+needed for persistence of knowledge.
 
-### Running the full Hawkeye application in Minikube
+There are multiple ways to run these components locally.
 
-The full Hawkeye application consists of a REST API that manages the Workers using the
-Kubernetes API.
+### Minikube (full application)
 
-First we build the API docker image:
+To orchestrate all local services in a way similar to how they run in production, we
+can use
+[Minikube](https://minikube.sigs.k8s.io/docs/start/) to have a local Kubernetes
+experience.
 
-```bash
-docker build -f api.Dockerfile -t hawkeye-api .
-```
+> TODO: We need to finish creating a helm chart to use this method.
 
-### Running the Worker directly with Docker
+### Docker
 
 > `hawkeye-api` currently has a hard dependency on being executed within a Kubernetes
 > environment. See the above section on running locally via Minikube which supports
 > running _all_ services locally.
 
+To run a Worker service:
+
 ```bash
 docker build -f worker.Dockerfile -t hawkeye-worker .
+
 docker run -it \
   -p 5000:5000/udp \
   -p 3030:3030 \
-  -v /home/user/dev/hawkeye/fixtures:/local \
+  -v $(pwd)/fixtures:/local \
   hawkeye-worker /local/watcher.json
+```
+
+Where:
+- `5000:5000` exposes the API on port `5000`
+- `3030:3030`
+
+### OS X
+
+```shell
+brew install ffmpeg
+brew install gst-libav gst-plugins-base gst-plugins-good gst-plugins-bad gstreamer
+
+ffmpeg -f avfoundation -list_devices true -i ""
+ffmpeg \
+  -f avfoundation \
+  -pix_fmt yuyv422 \
+  -video_size 640x480 \
+  -framerate 15 \
+  -i "1:1" -ac 2 \
+  -vf format=yuyv422 \
+  -vcodec h264 \
+  -bufsize 2000k -acodec aac -ar 44100 -b:a 128k \
+  -f rtp_mpegts udp://0.0.0.0:5000
+
+ffmpeg \
+    -re \
+    -i Big_Buck_Bunny_360_10s_1MB.mp4 \
+    -an \
+    -c:v copy \
+    -f rtp \
+    -sdp_file video.sdp \
+    "rtp://0.0.0.0:5000"
+
 ```
 
 ## Prometheus Metrics
