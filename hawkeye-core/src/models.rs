@@ -2,13 +2,27 @@ use color_eyre::{eyre::eyre, Result};
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 use std::collections::HashMap;
+use std::ffi::OsStr;
+use std::path::Path;
+use url::Url;
+
+const VALID_PROTOCOLS: [&str; 2] = [
+    "http",
+    "https",
+];
+
+const VALID_FILE_EXTENSIONS: [&str; 3] = [
+    "jpg",
+    "jpeg",
+    "png",
+];
+
 
 #[skip_serializing_none]
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
 pub struct Watcher {
     pub id: Option<String>,
     pub description: Option<String>,
-    pub slate_url: String,
     pub status: Option<Status>,
     pub status_description: Option<String>,
     pub source: Source,
@@ -17,14 +31,12 @@ pub struct Watcher {
 
 impl Watcher {
     pub fn is_valid(&self) -> Result<()> {
-        if self.slate_url.starts_with("http://")
-            || self.slate_url.starts_with("https://")
-            || self.slate_url.starts_with("file://")
-        {
-            Ok(self.source.is_valid()?)
-        } else {
-            Err(eyre!("{} not recognized as a valid URL!", self.slate_url))
-        }
+        log::error!("Watcher is_valid called...");
+        // TODO: can this clone() be avoided?
+        self.transitions.clone()
+            .into_iter()
+            .try_for_each(|t| t.is_valid())
+            .and(self.source.is_valid())
     }
 }
 
@@ -84,8 +96,80 @@ pub enum Protocol {
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
 pub struct Transition {
     pub from: VideoMode,
+    pub from_context: FromContext,
     pub to: VideoMode,
+    pub to_context: ToContext,
     pub actions: Vec<Action>,
+}
+
+impl Transition {
+    fn is_valid(&self) -> Result<()> {
+        log::error!("Transition is_Valid: {:?} {:?}", self.from_context.is_valid(), self.to_context.is_valid());
+        self.from_context.is_valid()
+            .and(self.to_context.is_valid())
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
+pub struct FromContext {
+    slate_url: String,
+}
+
+impl FromContext {
+    fn is_valid(&self) -> Result<()> {
+        let parsed = Url::parse(&self.slate_url)?;
+        let ext = Path::new(parsed.path()).extension().and_then(OsStr::to_str).unwrap();
+        let scheme = parsed.scheme();
+
+        log::error!("from context parsed: {:?}  ext: {:?}  scheme: {:?}", parsed, ext, scheme);
+
+        if !VALID_FILE_EXTENSIONS.contains(&ext) {
+            Err(eyre!(
+                "File extension {} must be one of {:?}",
+                &ext,
+                VALID_FILE_EXTENSIONS,
+            ))
+        } else if !VALID_PROTOCOLS.contains(&scheme) {
+            Err(eyre!(
+                "Protocol {} must be one of {:?}",
+                &ext,
+                VALID_PROTOCOLS,
+            ))
+        } else {
+            Ok(())
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
+pub struct ToContext {
+    slate_url: String,
+}
+
+impl ToContext {
+    fn is_valid(&self) -> Result<()> {
+        let parsed = Url::parse(&self.slate_url)?;
+        let ext = Path::new(parsed.path()).extension().and_then(OsStr::to_str).unwrap();
+        let scheme = parsed.scheme();
+
+        log::error!("to context parsed: {:?}  ext: {:?}  scheme: {:?}", parsed, ext, scheme);
+
+        if !VALID_FILE_EXTENSIONS.contains(&ext) {
+            Err(eyre!(
+                "File extension {} must be one of {:?}",
+                &ext,
+                VALID_FILE_EXTENSIONS,
+            ))
+        } else if !VALID_PROTOCOLS.contains(&scheme) {
+            Err(eyre!(
+                "Protocol {} must be one of {:?}",
+                &ext,
+                VALID_PROTOCOLS,
+            ))
+        } else {
+            Ok(())
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Copy, Clone, Debug, Eq, PartialEq)]
@@ -189,7 +273,6 @@ mod tests {
         Watcher {
             id: Some("ee21fc9a-7225-450b-a2a7-2faf914e35b8".to_string()),
             description: Some("UEFA 2020 - Lyon vs. Bayern".to_string()),
-            slate_url: "file://./resources/slate_120px.jpg".to_string(),
             status: Some(Status::Running),
             status_description: None,
             source: Source {
@@ -202,7 +285,13 @@ mod tests {
             transitions: vec![
                 Transition {
                     from: VideoMode::Content,
+                    from_context: FromContext{
+                        slate_url: "file://./resources/slate_120px.jpg".to_string()
+                    },
                     to: VideoMode::Slate,
+                    to_context: ToContext {
+                        slate_url: "file://./resources/slate_120px.jpg".to_string()
+                    },
                     actions: vec![
                         Action::HttpCall( HttpCall {
                             description: Some("Trigger AdBreak using API".to_string()),

@@ -133,20 +133,23 @@ fn json_body() -> impl Filter<Extract = (Watcher,), Error = warp::Rejection> + C
 
 /// An API error serializable to JSON.
 #[derive(Serialize)]
-struct ErrorMessage {
+struct ErrorResponse {
     message: String,
 }
 
 async fn handle_rejection(
     err: warp::Rejection,
 ) -> Result<impl warp::Reply, std::convert::Infallible> {
-    let message = "Error calling the API".to_string();
+    let mut message= "".to_string();
     let code;
 
     log::debug!("Rejection = {:?}", err);
 
     if err.is_not_found() {
         code = StatusCode::NOT_FOUND;
+    } else if let Some(err) = err.find::<warp::filters::body::BodyDeserializeError>() {
+        code = StatusCode::BAD_REQUEST;
+        message = err.to_string();
     } else if err.find::<auth::NoAuth>().is_some() {
         code = StatusCode::UNAUTHORIZED;
     } else if let Some(missing) = err.find::<warp::reject::MissingHeader>() {
@@ -155,13 +158,20 @@ async fn handle_rejection(
         } else {
             code = StatusCode::BAD_REQUEST;
         }
-    } else if err.find::<warp::reject::MethodNotAllowed>().is_some() {
+    } else if let Some(_) = err.find::<warp::reject::MethodNotAllowed>() {
         code = StatusCode::METHOD_NOT_ALLOWED;
     } else {
         log::debug!("Unhandled rejection: {:?}", err);
         code = StatusCode::INTERNAL_SERVER_ERROR;
     }
 
-    let json = warp::reply::json(&ErrorMessage { message });
+    // Use the status code's text value as the default message if none supplied.
+    message.is_empty().then(|| {
+        message = match &code.canonical_reason() {
+            Some(reason) => reason.to_string(),
+            None => "an unknown server error has occurred".to_string(),
+        }
+    });
+    let json = warp::reply::json(&ErrorResponse { message: message.to_string() });
     Ok(warp::reply::with_status(json, code))
 }
