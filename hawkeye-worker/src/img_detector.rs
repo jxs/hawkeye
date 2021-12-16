@@ -2,10 +2,13 @@ use color_eyre::Result;
 use dssim::{DssimImage, ToRGBAPLU, RGBAPLU};
 use imgref::{Img, ImgVec};
 use load_image::{Image, ImageData};
+use hawkeye_core::models::Transition;
 
 pub struct Slate {
     slate: DssimImage<f32>,
     similarity_algorithm: dssim::Dssim,
+    // TODO: This should probably be a ref. Needs a lifetime specifier.
+    transition: Option<Transition>,
 }
 
 impl Slate {
@@ -13,7 +16,7 @@ impl Slate {
     /// Create a new Slate using the image bytes and the selected similarity algorithm.
     /// Note: similarity_algorithm can only be `dssim::Dssim` at the moment, so this is essentially
     /// hardcoded in type and value.
-    pub fn new(slate_data: &[u8]) -> Result<Self> {
+    pub fn new(slate_data: &[u8], transition: Option<Transition>) -> Result<Self> {
         let slate_img = load_data(slate_data)?;
 
         // There's only one algo at the moment, so hardcode it instead of making it an argument.
@@ -22,6 +25,7 @@ impl Slate {
 
         Ok(Self {
             slate,
+            transition,
             similarity_algorithm,
         })
     }
@@ -54,7 +58,7 @@ impl SlateDetector {
         })
     }
 
-    pub fn is_match(&self, image_buffer: &[u8]) -> bool {
+    pub fn matched_slate(&self, image_buffer: &[u8]) -> &Slate {
         // since we are doing the work to grab the image buffer frame, we should compare all slates here?
         let frame_img = load_data(image_buffer).unwrap();
         let frame = self.similarity_algorithm.create_image(&frame_img).unwrap();
@@ -67,7 +71,7 @@ impl SlateDetector {
                     _ => None,
                 }
             })
-            .is_some()
+            .unwrap()
     }
 }
 

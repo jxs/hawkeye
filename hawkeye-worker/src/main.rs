@@ -51,7 +51,7 @@ fn main() -> Result<()> {
         if let Some(context) = &transition.to_context {
             if let Some(slate_context) = &context.slate_context {
                 to_slates.push(
-                    Slate::new(&slate::load_img(slate_context.slate_url.as_str())?)?
+                    Slate::new(&slate::load_img(slate_context.slate_url.as_str())?, Some(transition.clone()))?
                 );
             }
         }

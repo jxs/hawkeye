@@ -41,14 +41,14 @@ pub enum Event {
 
 pub fn process_frames(
     frame_source: impl Iterator<Item = Result<Option<Vec<u8>>>>,
-    detector: SlateDetector,
+    slate_detector: SlateDetector,
     running: Arc<AtomicBool>,
     action_sink: Sender<Event>,
 ) -> Result<()> {
     log::debug!("process_frames called...");
 
     let black_image = include_bytes!("../../resources/black_120px.jpg");
-    let black_slate = Slate::new(black_image);
+    let black_slate = Slate::new(black_image, None);
     let black_detector = SlateDetector::new(vec![black_slate.unwrap()])?;
 
     // TODO: Comment on why this is needed.
@@ -73,15 +73,15 @@ pub fn process_frames(
             }
         };
 
-        let is_black = black_detector.is_match(local_buffer.as_slice());
+        let is_black = Some(black_detector.matched_slate(local_buffer.as_slice())).is_some();
         log::debug!("process_frames is_black={}", is_black);
 
-        let mut is_match = false;
+        let mut matched_slate: Option<&Slate> = None;
 
         if !is_black {
             let t = SIMILARITY_EXECUTION_DURATION.start_timer();
 
-            is_match = detector.is_match(local_buffer.as_slice());
+            matched_slate = Some(slate_detector.matched_slate(local_buffer.as_slice()));
 
             // is_match will be the result of
 
@@ -103,14 +103,14 @@ pub fn process_frames(
         }
 
         // If the frame matched a slate, then start the Slate workflow.
-        if is_match {
+        if matched_slate.is_some() {
             log::trace!("Found slate image in video stream!");
             FOUND_SLATE_COUNTER.inc();
             action_sink.send(Event::Mode(VideoMode::Slate)).unwrap();
         } else {
+            log::trace!("Content in video stream!");
             FOUND_CONTENT_COUNTER.inc();
             action_sink.send(Event::Mode(VideoMode::Content)).unwrap();
-            log::trace!("Content in video stream!");
         }
 
         SIMILARITY_EXECUTION_COUNTER.inc();
