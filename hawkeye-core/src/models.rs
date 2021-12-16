@@ -2,20 +2,17 @@ use color_eyre::{eyre::eyre, Result};
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 use std::collections::HashMap;
-use std::ffi::OsStr;
-use std::path::Path;
-use url::Url;
 
-const VALID_PROTOCOLS: [&str; 2] = [
-    "http",
-    "https",
-];
-
-const VALID_FILE_EXTENSIONS: [&str; 3] = [
-    "jpg",
-    "jpeg",
-    "png",
-];
+// const VALID_PROTOCOLS: [&str; 2] = [
+//     "http",
+//     "https",
+// ];
+//
+// const VALID_FILE_EXTENSIONS: [&str; 3] = [
+//     "jpg",
+//     "jpeg",
+//     "png",
+// ];
 
 
 #[skip_serializing_none]
@@ -96,80 +93,102 @@ pub enum Protocol {
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
 pub struct Transition {
     pub from: VideoMode,
-    pub from_context: FromContext,
+    pub from_context: Option<FromContext>,
     pub to: VideoMode,
-    pub to_context: ToContext,
+    pub to_context: Option<ToContext>,
     pub actions: Vec<Action>,
 }
 
 impl Transition {
     fn is_valid(&self) -> Result<()> {
-        log::error!("Transition is_Valid: {:?} {:?}", self.from_context.is_valid(), self.to_context.is_valid());
-        self.from_context.is_valid()
-            .and(self.to_context.is_valid())
+        // log::debug!("Transition is_valid check: from_context={:?} to_context={:?}",
+        //             self.from_context.is_valid(&self.from), self.to_context.is_valid(&self.to));
+        // let foo = match &self.from_context {
+        //     Some(c) => c.is_valid(&self.from),
+        //     None => Ok
+        // };
+
+        // self.from_context.as_ref().and_ unwrap().is_valid(&self.from)
+        //     .and(self.to_context.as_ref().unwrap().is_valid(&self.to))
+
+        // self.from_context.unwrap_or(FromContext).is_valid(&self.from)
+
+        // self.from_context.as_ref().and_ unwrap().is_valid(&self.from)
+        //     .and(self.to_context.as_ref().unwrap().is_valid(&self.to))
+
+        Ok(())
     }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
 pub struct FromContext {
-    slate_url: String,
+    pub slate_context: Option<SlateContext>,
 }
 
 impl FromContext {
-    fn is_valid(&self) -> Result<()> {
-        let parsed = Url::parse(&self.slate_url)?;
-        let ext = Path::new(parsed.path()).extension().and_then(OsStr::to_str).unwrap();
-        let scheme = parsed.scheme();
-
-        log::error!("from context parsed: {:?}  ext: {:?}  scheme: {:?}", parsed, ext, scheme);
-
-        if !VALID_FILE_EXTENSIONS.contains(&ext) {
-            Err(eyre!(
-                "File extension {} must be one of {:?}",
-                &ext,
-                VALID_FILE_EXTENSIONS,
-            ))
-        } else if !VALID_PROTOCOLS.contains(&scheme) {
-            Err(eyre!(
-                "Protocol {} must be one of {:?}",
-                &ext,
-                VALID_PROTOCOLS,
-            ))
-        } else {
-            Ok(())
-        }
-    }
+    // fn is_valid(&self, state: &VideoMode) -> Result<()> {
+    //     // match from_state {
+    //     //     VideoMode::Slate => self.slate_context.,
+    //     //     _ => None,
+    //     // }
+    //     // Ok(())
+    //     Ok(())
+    // }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
 pub struct ToContext {
-    slate_url: String,
+    pub slate_context: Option<SlateContext>,
 }
 
 impl ToContext {
-    fn is_valid(&self) -> Result<()> {
-        let parsed = Url::parse(&self.slate_url)?;
-        let ext = Path::new(parsed.path()).extension().and_then(OsStr::to_str).unwrap();
-        let scheme = parsed.scheme();
+    // fn is_valid(&self, state: &VideoMode) -> Result<()> {
+    //     // match from_state {
+    //     //     VideoMode::Slate => self.slate_context.,
+    //     //     _ => None,
+    //     // }
+    //     Ok(())
+    // }
+}
 
-        log::error!("to context parsed: {:?}  ext: {:?}  scheme: {:?}", parsed, ext, scheme);
+#[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
+pub struct SlateContext {
+    pub slate_url: String,
+}
 
-        if !VALID_FILE_EXTENSIONS.contains(&ext) {
-            Err(eyre!(
-                "File extension {} must be one of {:?}",
-                &ext,
-                VALID_FILE_EXTENSIONS,
-            ))
-        } else if !VALID_PROTOCOLS.contains(&scheme) {
-            Err(eyre!(
-                "Protocol {} must be one of {:?}",
-                &ext,
-                VALID_PROTOCOLS,
-            ))
-        } else {
-            Ok(())
-        }
-    }
+impl SlateContext {
+    // fn is_valid(&self, state: &VideoMode) -> Result<()> {
+    //
+    //     match state {
+    //         VideoMode::Content => return Ok(()),
+    //         VideoMode::Slate => {
+    //             // Validate slate_url particulars.
+    //             // let slate_url = match &self.slate_url {
+    //             //     Some(a) => a,
+    //             //     None => return Err(eyre!("slate_url is required for this context")),
+    //             // };
+    //             let parsed = Url::parse(&self.slate_url)?;
+    //             let ext = Path::new(parsed.path()).extension().and_then(OsStr::to_str).unwrap();
+    //             let scheme = parsed.scheme();
+    //
+    //             log::debug!("from context parsed: {:?}  ext: {:?}  scheme: {:?}", parsed, ext, scheme);
+    //
+    //             if !VALID_FILE_EXTENSIONS.contains(&ext) {
+    //                 Err(eyre!(
+    //                     "File extension must be one of {:?}",
+    //                     VALID_FILE_EXTENSIONS.join(", "),
+    //                 ))
+    //             } else if !VALID_PROTOCOLS.contains(&scheme) {
+    //                 Err(eyre!(
+    //                     "Protocol must be one of {:?}",
+    //                     VALID_PROTOCOLS.join(", "),
+    //                 ))
+    //             } else {
+    //                 Ok(())
+    //             }
+    //         },
+    //     }
+    // }
 }
 
 #[derive(Serialize, Deserialize, Copy, Clone, Debug, Eq, PartialEq)]

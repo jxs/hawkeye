@@ -29,8 +29,11 @@ experience.
 ### Docker
 
 > `hawkeye-api` currently has a hard dependency on being executed within a Kubernetes
-> environment. See the above section on running locally via Minikube which supports
-> running _all_ services locally.
+> environment.
+
+```bash
+export HAWKEYE_DOCKER_IMAGE=hawkeye-dev:latest
+```
 
 To run a Worker service:
 
@@ -90,3 +93,7 @@ The payload looks something like:
 ```json
 
 ```
+
+
+-----
+

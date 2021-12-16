@@ -3,15 +3,21 @@ use dssim::{DssimImage, ToRGBAPLU, RGBAPLU};
 use imgref::{Img, ImgVec};
 use load_image::{Image, ImageData};
 
-pub struct SlateDetector {
+pub struct Slate {
     slate: DssimImage<f32>,
     similarity_algorithm: dssim::Dssim,
 }
 
-impl SlateDetector {
-    pub fn new(slate: &[u8]) -> Result<Self> {
+impl Slate {
+
+    /// Create a new Slate using the image bytes and the selected similarity algorithm.
+    /// Note: similarity_algorithm can only be `dssim::Dssim` at the moment, so this is essentially
+    /// hardcoded in type and value.
+    pub fn new(slate_data: &[u8]) -> Result<Self> {
+        let slate_img = load_data(slate_data)?;
+
+        // There's only one algo at the moment, so hardcode it instead of making it an argument.
         let similarity_algorithm = dssim::Dssim::new();
-        let slate_img = load_data(slate)?;
         let slate = similarity_algorithm.create_image(&slate_img).unwrap();
 
         Ok(Self {
@@ -20,15 +26,48 @@ impl SlateDetector {
         })
     }
 
-    pub fn is_match(&self, image_buffer: &[u8]) -> bool {
-        let frame_img = load_data(image_buffer).unwrap();
-        let frame = self.similarity_algorithm.create_image(&frame_img).unwrap();
-
+    pub fn is_match(&self, frame: &DssimImage<f32>) -> bool {
         let (res, _) = self.similarity_algorithm.compare(&self.slate, frame);
         let val: f64 = res.into();
         let val = (val * 1000f64) as u32;
 
         val <= 900u32
+    }
+}
+
+/// Provide functionality to match a set of slates to an incoming image_buffer, typically from a
+/// frame in a stream of video.
+pub struct SlateDetector {
+    slates: Vec<Slate>,
+    // TODO: this should either be here (ideal) or on each Slate.
+    similarity_algorithm: dssim::Dssim,
+}
+
+impl SlateDetector {
+    pub fn new(slates: Vec<Slate>) -> Result<Self> {
+        // There's only one algo at the moment, so hardcode it instead of making it an argument.
+        let similarity_algorithm = dssim::Dssim::new();
+
+        Ok(Self {
+            slates,
+            similarity_algorithm,
+        })
+    }
+
+    pub fn is_match(&self, image_buffer: &[u8]) -> bool {
+        // since we are doing the work to grab the image buffer frame, we should compare all slates here?
+        let frame_img = load_data(image_buffer).unwrap();
+        let frame = self.similarity_algorithm.create_image(&frame_img).unwrap();
+
+        self.slates
+            .iter()
+            .find_map(|slate| {
+                match slate.is_match(&frame) {
+                    true => Some(slate),
+                    _ => None,
+                }
+            })
+            .is_some()
     }
 }
 

@@ -54,6 +54,8 @@ impl ActionExecutor {
     }
 
     // Manage the execution of an action based on the provided video mode.
+    // pub fn execute(&mut self, transition: models::Transition) {
+    //     if let Some(result) = self.call_action(&transition) {
     pub fn execute(&mut self, mode: VideoMode) {
         if let Some(result) = self.call_action(mode) {
             match result {
@@ -65,10 +67,14 @@ impl ActionExecutor {
             }
         }
         self.last_mode = Some(mode);
+        // self.last_transition = Some(transition)
     }
 
     /// Executes the action if the video mode matches the transition and if the action is
     /// allowed to run.
+    ///     fn call_action(&mut self, current_transition: &models::Transition) -> Option<Result<()>> {
+    //         self.last_transition.and_then(|current_transition| {
+    //             if self.allowed_to_run() && TransitionStateChange(last_transition, current_transition) == self.transition {
     fn call_action(&mut self, mode: VideoMode) -> Option<Result<()>> {
         self.last_mode.and_then(|last_mode| {
             if Transition(last_mode, mode) == self.transition && self.allowed_to_run() {
@@ -92,8 +98,10 @@ impl ActionExecutor {
 }
 
 // TODO: Delete this type
+// TODO: ^^^ why?
 pub(crate) struct Executors(pub(crate) Vec<ActionExecutor>);
 
+/// Convert a Transition to a Vec<ActionExecutors>
 impl From<models::Transition> for Executors {
     fn from(transition: models::Transition) -> Self {
         let target_transition = Transition(transition.from, transition.to);
@@ -229,7 +237,7 @@ mod tests {
             execute_returns: Some(Ok(())),
         };
         let mut executor = ActionExecutor::new(
-            Transition(VideoMode::Content, VideoMode::Slate),
+            TransitionStateChange(VideoMode::Content, VideoMode::Slate),
             Action::FakeAction(fake_action),
         );
         executor.execute(VideoMode::Content);
@@ -249,7 +257,7 @@ mod tests {
             execute_returns: Some(Ok(())),
         };
         let mut executor = ActionExecutor::new(
-            Transition(VideoMode::Content, VideoMode::Slate),
+            TransitionStateChange(VideoMode::Content, VideoMode::Slate),
             Action::FakeAction(fake_action),
         );
         executor.execute(VideoMode::Content);
@@ -271,7 +279,7 @@ mod tests {
             execute_returns: Some(Ok(())),
         };
         let mut executor = ActionExecutor::new(
-            Transition(VideoMode::Content, VideoMode::Slate),
+            TransitionStateChange(VideoMode::Content, VideoMode::Slate),
             Action::FakeAction(fake_action),
         );
         executor.execute(VideoMode::Content);
@@ -297,7 +305,7 @@ mod tests {
             execute_returns: Some(Ok(())),
         };
         let mut executor = ActionExecutor::new(
-            Transition(VideoMode::Content, VideoMode::Slate),
+            TransitionStateChange(VideoMode::Content, VideoMode::Slate),
             Action::FakeAction(fake_action),
         );
         executor.execute(VideoMode::Content);
@@ -322,7 +330,7 @@ mod tests {
             execute_returns: Some(Ok(())),
         };
         let mut executor = ActionExecutor::new(
-            Transition(VideoMode::Content, VideoMode::Slate),
+            TransitionStateChange(VideoMode::Content, VideoMode::Slate),
             Action::FakeAction(fake_action),
         );
         // Prepare executor to be ready in the next call with `VideoMode::Slate`

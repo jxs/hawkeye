@@ -4,7 +4,7 @@ use structopt::StructOpt;
 #[derive(Debug, StructOpt)]
 #[structopt(
     name = "video-slate-detector",
-    about = "Detects slate image and triggers URL request."
+    about = "Detects slate image and triggers User configurable actions."
 )]
 pub struct AppConfig {
     // Path to the watcher configuration

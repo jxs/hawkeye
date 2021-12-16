@@ -1,4 +1,4 @@
-use crate::img_detector::SlateDetector;
+use crate::img_detector::{Slate, SlateDetector};
 use crate::metrics::{
     FOUND_CONTENT_COUNTER, FOUND_SLATE_COUNTER, FRAME_PROCESSING_DURATION,
     SIMILARITY_EXECUTION_COUNTER, SIMILARITY_EXECUTION_DURATION,
@@ -45,10 +45,15 @@ pub fn process_frames(
     running: Arc<AtomicBool>,
     action_sink: Sender<Event>,
 ) -> Result<()> {
-    let black_image = include_bytes!("../../resources/black_120px.jpg");
-    let black_detector = SlateDetector::new(black_image)?;
+    log::debug!("process_frames called...");
 
+    let black_image = include_bytes!("../../resources/black_120px.jpg");
+    let black_slate = Slate::new(black_image);
+    let black_detector = SlateDetector::new(vec![black_slate.unwrap()])?;
+
+    // TODO: Comment on why this is needed.
     let mut empty_iterations = 0;
+
     for frame in frame_source {
         let frame_processing_timer = FRAME_PROCESSING_DURATION.start_timer();
         let local_buffer = match frame? {
@@ -69,12 +74,16 @@ pub fn process_frames(
         };
 
         let is_black = black_detector.is_match(local_buffer.as_slice());
+        log::debug!("process_frames is_black={}", is_black);
 
         let mut is_match = false;
+
         if !is_black {
             let t = SIMILARITY_EXECUTION_DURATION.start_timer();
 
             is_match = detector.is_match(local_buffer.as_slice());
+
+            // is_match will be the result of
 
             let took_in_seconds = t.stop_and_record();
             log::trace!("Similarity algorithm ran in {} seconds", took_in_seconds);
@@ -88,10 +97,12 @@ pub fn process_frames(
             write_txn.commit();
         }
 
+        // If the slate is black, then it clearly won't match a slate image.
         if is_black {
             continue;
         }
 
+        // If the frame matched a slate, then start the Slate workflow.
         if is_match {
             log::trace!("Found slate image in video stream!");
             FOUND_SLATE_COUNTER.inc();
@@ -101,10 +112,14 @@ pub fn process_frames(
             action_sink.send(Event::Mode(VideoMode::Content)).unwrap();
             log::trace!("Content in video stream!");
         }
+
         SIMILARITY_EXECUTION_COUNTER.inc();
 
+        // Trace the frame processing time.
         let took_in_seconds = frame_processing_timer.stop_and_record();
         log::trace!("Frame processing took {} seconds", took_in_seconds);
+
+        // Stop running if the AtomicBool `running` is no longer truthy.
         if !running.load(Ordering::SeqCst) {
             break;
         }
