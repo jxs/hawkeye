@@ -1,4 +1,4 @@
-use crate::config::{NAMESPACE, CALL_WATCHER_TIMEOUT};
+use crate::config::{CALL_WATCHER_TIMEOUT, NAMESPACE};
 use crate::templates;
 use crate::templates::container_spec;
 use hawkeye_core::models::{Status, Watcher};
@@ -153,7 +153,7 @@ pub async fn upgrade_watcher(id: String, client: Client) -> Result<impl warp::Re
         .patch(
             deployment.metadata.name.as_ref().unwrap(),
             &patch_params,
-            &Patch::Apply(spec_updated)
+            &Patch::Apply(spec_updated),
         )
         .await
     {
@@ -316,10 +316,7 @@ pub async fn get_video_frame(id: String, client: Client) -> Result<impl warp::Re
             let url = format!("http://{}:{}/latest_frame", pod_ip, port);
 
             log::info!("Calling Pod using url: {}", url);
-            let response=  match http_client
-                .get(url.as_str())
-                .send()
-                .await {
+            let response = match http_client.get(url.as_str()).send().await {
                 Ok(r) => r,
                 Err(error) => {
                     log::error!("Could not call {} endpoint: {:?}", url, error);
@@ -328,9 +325,7 @@ pub async fn get_video_frame(id: String, client: Client) -> Result<impl warp::Re
                 }
             };
 
-            match response
-                .error_for_status()
-            {
+            match response.error_for_status() {
                 Ok(image_response) => {
                     let headers = resp.headers_mut();
                     headers.insert(CONTENT_TYPE, HeaderValue::from_static("image/png"));
@@ -403,9 +398,9 @@ pub async fn start_watcher(id: String, client: Client) -> Result<impl warp::Repl
             });
             deployments_client
                 .patch_scale(
-              deployment.metadata.name.as_ref().unwrap(),
-                &patch_params,
-              &Patch::Merge(&deployment_scale_json)
+                    deployment.metadata.name.as_ref().unwrap(),
+                    &patch_params,
+                    &Patch::Merge(&deployment_scale_json),
                 )
                 .await
                 .unwrap();
@@ -443,7 +438,6 @@ pub async fn start_watcher(id: String, client: Client) -> Result<impl warp::Repl
         )),
     }
 }
-
 
 /// Stop a Watcher worker by making sure there's a replica count of 0 for the Kubernetes
 /// deployment.
@@ -487,9 +481,9 @@ pub async fn stop_watcher(id: String, client: Client) -> Result<impl warp::Reply
             });
             deployments_client
                 .patch_scale(
-              deployment.metadata.name.as_ref().unwrap(),
-                &patch_params,
-              &Patch::Merge(&deployment_scale_json)
+                    deployment.metadata.name.as_ref().unwrap(),
+                    &patch_params,
+                    &Patch::Merge(&deployment_scale_json),
                 )
                 .await
                 .unwrap();
