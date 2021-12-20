@@ -4,7 +4,7 @@ use crate::templates::container_spec;
 use hawkeye_core::models::{Status, Watcher};
 use k8s_openapi::api::apps::v1::Deployment;
 use k8s_openapi::api::core::v1::{ConfigMap, Pod, Service};
-use kube::api::{DeleteParams, ListParams, PatchParams, PostParams};
+use kube::api::{DeleteParams, ListParams, Patch, PatchParams, PostParams};
 use kube::{Api, Client};
 use serde_json::json;
 use std::collections::HashMap;
@@ -21,7 +21,7 @@ pub async fn list_watchers(client: Client) -> Result<impl warp::Reply, Infallibl
         .labels("app=hawkeye,watcher_id")
         .timeout(10);
 
-    // Get all deployments we know, we want to return the status of each watcher
+    // Get all K8S deployments we know, we want to return the status of each watcher
     let deployments_client: Api<Deployment> = Api::namespaced(client.clone(), &NAMESPACE);
     let deployments = deployments_client.list(&lp).await.unwrap();
     let mut deployments_index = HashMap::new();
@@ -37,18 +37,18 @@ pub async fn list_watchers(client: Client) -> Result<impl warp::Reply, Infallibl
     let mut watchers: Vec<Watcher> = Vec::new();
     for config in config_maps.items {
         let data = config.data.unwrap();
-        let mut w: Watcher = serde_json::from_str(data.get("watcher.json").unwrap()).unwrap();
+        let mut watcher: Watcher = serde_json::from_str(data.get("watcher.json").unwrap()).unwrap();
         let calculated_status = if let Some(status) =
-            deployments_index.get(w.id.as_ref().unwrap_or(&"undefined".to_string()))
+            deployments_index.get(watcher.id.as_ref().unwrap_or(&"undefined".to_string()))
         {
             *status
         } else {
             Status::Error
         };
-        w.status = Some(calculated_status);
+        watcher.status = Some(calculated_status);
         // TODO: Comes from the service
-        w.source.ingest_ip = None;
-        watchers.push(w);
+        watcher.source.ingest_ip = None;
+        watchers.push(watcher);
     }
 
     Ok(warp::reply::json(&watchers))
@@ -153,7 +153,7 @@ pub async fn upgrade_watcher(id: String, client: Client) -> Result<impl warp::Re
         .patch(
             deployment.metadata.name.as_ref().unwrap(),
             &patch_params,
-            serde_json::to_vec(&spec_updated).unwrap(),
+            &Patch::Apply(spec_updated)
         )
         .await
     {
@@ -332,11 +332,13 @@ pub async fn get_video_frame(id: String, client: Client) -> Result<impl warp::Re
                 .error_for_status()
             {
                 Ok(image_response) => {
-                    let image_bytes = image_response.bytes().await.unwrap();
                     let headers = resp.headers_mut();
                     headers.insert(CONTENT_TYPE, HeaderValue::from_static("image/png"));
                     headers.insert(CACHE_CONTROL, HeaderValue::from_static("no-store"));
-                    *resp.body_mut() = Body::from(image_bytes);
+
+                    let image_bytes = image_response.bytes().await.unwrap();
+                    *resp.body_mut() = Body::from(image_bytes.to_vec());
+
                     return Ok(resp);
                 }
                 Err(_) => {
@@ -353,8 +355,12 @@ pub async fn get_video_frame(id: String, client: Client) -> Result<impl warp::Re
     Ok(resp)
 }
 
+/// Start a Watcher worker by making sure there's a positive replica count for the Kubernetes
+/// deployment.
 pub async fn start_watcher(id: String, client: Client) -> Result<impl warp::Reply, Infallible> {
     let deployments_client: Api<Deployment> = Api::namespaced(client.clone(), &NAMESPACE);
+
+    // Get the Kubernetes deployment for the Watcher.
     // TODO: probably better to just get the scale
     let deployment = match deployments_client
         .get(&templates::deployment_name(&id))
@@ -368,50 +374,59 @@ pub async fn start_watcher(id: String, client: Client) -> Result<impl warp::Repl
             ))
         }
     };
+
+    // Actions and guards based on the current Watcher status.
     match deployment.get_watcher_status() {
         Status::Running => Ok(reply::with_status(
+            // No op, already running!
             reply::json(&json!({
                 "message": "Watcher is already running"
             })),
             StatusCode::OK,
         )),
         Status::Pending => Ok(reply::with_status(
+            // No op, committing other changes.
             reply::json(&json!({
-                "message": "Watcher is updating"
+                "message": "Watcher is currently updating"
             })),
             StatusCode::CONFLICT,
         )),
         Status::Ready => {
-            // Start watcher / replicas to 1
-            let patch_params = PatchParams::default();
+            // Start Watcher by setting Kubernetes deployment replicas=1
+            let mut patch_params = PatchParams::default();
+            patch_params.field_manager = Option::from("hawkeye_api".to_string());
 
-            let fs = json!({
-                "spec": { "replicas": 1 }
+            // Set Kubernetes deployment replica=1 via patch.
+            let deployment_scale_json = json!({
+                "apiVersion": "autoscaling/v1",
+                "spec": { "replicas": 1 },
             });
-            let o = deployments_client
+            deployments_client
                 .patch_scale(
-                    deployment.metadata.name.as_ref().unwrap(),
-                    &patch_params,
-                    serde_json::to_vec(&fs).unwrap(),
+              deployment.metadata.name.as_ref().unwrap(),
+                &patch_params,
+              &Patch::Merge(&deployment_scale_json)
                 )
                 .await
                 .unwrap();
-            log::debug!("Scale status: {:?}", o);
 
-            let status_label = json!({
+            // Update the status of the Watcher to indicate it should be running.
+            let status_label_json = json!({
+                "apiVersion": "apps/v1",
                 "metadata": {
                     "labels": {
-                        "target_status": Status::Running
+                        "target_status": Status::Running,
                     }
                 }
             });
-            let _ = deployments_client
+            deployments_client
                 .patch(
                     deployment.metadata.name.as_ref().unwrap(),
                     &patch_params,
-                    serde_json::to_vec(&status_label).unwrap(),
+                    &Patch::Merge(status_label_json),
                 )
-                .await;
+                .await
+                .unwrap();
 
             Ok(reply::with_status(
                 reply::json(&json!({
@@ -429,6 +444,9 @@ pub async fn start_watcher(id: String, client: Client) -> Result<impl warp::Repl
     }
 }
 
+
+/// Stop a Watcher worker by making sure there's a replica count of 0 for the Kubernetes
+/// deployment.
 pub async fn stop_watcher(id: String, client: Client) -> Result<impl warp::Reply, Infallible> {
     let deployments_client: Api<Deployment> = Api::namespaced(client.clone(), &NAMESPACE);
     // TODO: probably better to just get the scale
@@ -454,41 +472,45 @@ pub async fn stop_watcher(id: String, client: Client) -> Result<impl warp::Reply
         )),
         Status::Pending => Ok(reply::with_status(
             reply::json(&json!({
-                "message": "Watcher is updating"
+                "message": "Watcher is already updating"
             })),
             StatusCode::CONFLICT,
         )),
         Status::Running => {
             // Stop watcher / replicas to 0
-            let patch_params = PatchParams::default();
+            let mut patch_params = PatchParams::default();
+            patch_params.field_manager = Option::from("hawkeye_api".to_string());
 
-            let fs = json!({
-                "spec": { "replicas": 0 }
+            let deployment_scale_json = json!({
+                "apiVersion": "autoscaling/v1",
+                "spec": { "replicas": 0 },
             });
-            let o = deployments_client
+            deployments_client
                 .patch_scale(
-                    deployment.metadata.name.as_ref().unwrap(),
-                    &patch_params,
-                    serde_json::to_vec(&fs).unwrap(),
+              deployment.metadata.name.as_ref().unwrap(),
+                &patch_params,
+              &Patch::Merge(&deployment_scale_json)
                 )
                 .await
                 .unwrap();
-            log::debug!("Scale status: {:?}", o);
 
-            let status_label = json!({
+            // Update the status of the Watcher to indicate it should be running.
+            let status_label_json = json!({
+                "apiVersion": "apps/v1",
                 "metadata": {
                     "labels": {
-                        "target_status": Status::Ready
+                        "target_status": Status::Ready,
                     }
                 }
             });
-            let _ = deployments_client
+            deployments_client
                 .patch(
                     deployment.metadata.name.as_ref().unwrap(),
                     &patch_params,
-                    serde_json::to_vec(&status_label).unwrap(),
+                    &Patch::Merge(status_label_json),
                 )
-                .await;
+                .await
+                .unwrap();
 
             Ok(reply::with_status(
                 reply::json(&json!({
@@ -581,6 +603,7 @@ impl WatcherStatus for Deployment {
                 );
                 Status::Error
             });
+
         if let Some(status) = self.status.as_ref() {
             let deploy_status = if status.available_replicas.unwrap_or(0) > 0 {
                 Status::Running

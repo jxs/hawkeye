@@ -152,7 +152,7 @@ impl IntoIterator for RtpServer {
                 height
             ),
             (_, _) => {
-                panic!(format!("Container ({:?}) and Codec ({:?}) not available", self.container, self.codec));
+                panic!("Container ({:?}) and Codec ({:?}) not available", self.container, self.codec);
             }
         };
         VideoStream::new(pipeline_description).into_iter()
