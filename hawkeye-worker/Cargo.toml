@@ -14,7 +14,7 @@ glib = "0.14.8"
 gstreamer = "0.17.4"
 gstreamer-app = "0.17.2"
 derive_more = "0.99.17"
-dssim = "3.1.0"
+dssim = "2.11"
 load_image = { version = "2.15", features = ["static"] }
 imgref = "1.7"
 structopt = "0.3"
