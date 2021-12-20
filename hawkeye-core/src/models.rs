@@ -2,12 +2,25 @@ use color_eyre::{eyre::eyre, Result};
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 use std::collections::HashMap;
+use std::ffi::OsStr;
+use std::path::Path;
+use url::Url;
+use crate::models::VideoMode::Slate;
+use crate::config::{SLATE_URL_FILE_EXTENSIONS, SLATE_URL_SCHEMES};
 
-// const VALID_PROTOCOLS: [&str; 2] = [
+
+// const VALID_SCHEMES: [&str; 2] = [
 //     "http",
 //     "https",
 // ];
-//
+
+// lazy_static! {
+//     static ref VALID_SCHEMES: [&str; 2] = [
+//         "http",
+//         "https",
+//     ];
+// }
+
 // const VALID_FILE_EXTENSIONS: [&str; 3] = [
 //     "jpg",
 //     "jpeg",
@@ -29,10 +42,10 @@ pub struct Watcher {
 impl Watcher {
     pub fn is_valid(&self) -> Result<()> {
         log::error!("Watcher is_valid called...");
-        // TODO: can this clone() be avoided?
         self.transitions.clone()
             .into_iter()
             .try_for_each(|t| t.is_valid())
+            // Validate the source.
             .and(self.source.is_valid())
     }
 }
@@ -101,22 +114,20 @@ pub struct Transition {
 
 impl Transition {
     fn is_valid(&self) -> Result<()> {
-        // log::debug!("Transition is_valid check: from_context={:?} to_context={:?}",
-        //             self.from_context.is_valid(&self.from), self.to_context.is_valid(&self.to));
-        // let foo = match &self.from_context {
-        //     Some(c) => c.is_valid(&self.from),
-        //     None => Ok
-        // };
-
-        // self.from_context.as_ref().and_ unwrap().is_valid(&self.from)
-        //     .and(self.to_context.as_ref().unwrap().is_valid(&self.to))
-
-        // self.from_context.unwrap_or(FromContext).is_valid(&self.from)
-
-        // self.from_context.as_ref().and_ unwrap().is_valid(&self.from)
-        //     .and(self.to_context.as_ref().unwrap().is_valid(&self.to))
-
-        Ok(())
+        if self.from == Slate {
+             match self.from_context.as_ref() {
+                Some(fc) => {
+                    fc.is_valid(&self.from)
+                },
+                None => Err(eyre!("A `from_context` is required for from=Slate")),
+            }
+        } else {
+            // FromContext is only valid for from=slate at the moment.
+            match &self.from_context {
+                Some(_) => Err(eyre!("A `from_context` is not supported for the `from` state of {:?}", self.from)),
+                None => Ok(()),
+            }
+        }
     }
 }
 
@@ -126,14 +137,16 @@ pub struct FromContext {
 }
 
 impl FromContext {
-    // fn is_valid(&self, state: &VideoMode) -> Result<()> {
-    //     // match from_state {
-    //     //     VideoMode::Slate => self.slate_context.,
-    //     //     _ => None,
-    //     // }
-    //     // Ok(())
-    //     Ok(())
-    // }
+    pub fn is_valid(&self, state: &VideoMode) -> Result<()> {
+        if state == &VideoMode::Slate {
+            match &self.slate_context {
+                Some(slate) => slate.is_valid(),
+                None => Err(eyre!("A `slate_context` is required for from=Slate")),
+            }
+        } else {
+            Ok(())
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
@@ -142,13 +155,16 @@ pub struct ToContext {
 }
 
 impl ToContext {
-    // fn is_valid(&self, state: &VideoMode) -> Result<()> {
-    //     // match from_state {
-    //     //     VideoMode::Slate => self.slate_context.,
-    //     //     _ => None,
-    //     // }
-    //     Ok(())
-    // }
+    pub fn is_valid(&self, state: &VideoMode) -> Result<()> {
+        if state == &VideoMode::Slate {
+            match &self.slate_context {
+                Some(slate) => slate.is_valid(),
+                None => Err(eyre!("A `slate_context` is required for to=Slate")),
+            }
+        } else {
+            Ok(())
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
@@ -157,38 +173,26 @@ pub struct SlateContext {
 }
 
 impl SlateContext {
-    // fn is_valid(&self, state: &VideoMode) -> Result<()> {
-    //
-    //     match state {
-    //         VideoMode::Content => return Ok(()),
-    //         VideoMode::Slate => {
-    //             // Validate slate_url particulars.
-    //             // let slate_url = match &self.slate_url {
-    //             //     Some(a) => a,
-    //             //     None => return Err(eyre!("slate_url is required for this context")),
-    //             // };
-    //             let parsed = Url::parse(&self.slate_url)?;
-    //             let ext = Path::new(parsed.path()).extension().and_then(OsStr::to_str).unwrap();
-    //             let scheme = parsed.scheme();
-    //
-    //             log::debug!("from context parsed: {:?}  ext: {:?}  scheme: {:?}", parsed, ext, scheme);
-    //
-    //             if !VALID_FILE_EXTENSIONS.contains(&ext) {
-    //                 Err(eyre!(
-    //                     "File extension must be one of {:?}",
-    //                     VALID_FILE_EXTENSIONS.join(", "),
-    //                 ))
-    //             } else if !VALID_PROTOCOLS.contains(&scheme) {
-    //                 Err(eyre!(
-    //                     "Protocol must be one of {:?}",
-    //                     VALID_PROTOCOLS.join(", "),
-    //                 ))
-    //             } else {
-    //                 Ok(())
-    //             }
-    //         },
-    //     }
-    // }
+    fn is_valid(&self) -> Result<()> {
+        // Validate slate_url particulars.
+        let parsed = Url::parse(&self.slate_url)?;
+        let ext = Path::new(parsed.path()).extension().and_then(OsStr::to_str).unwrap();
+        let scheme = parsed.scheme();
+
+        if !SLATE_URL_FILE_EXTENSIONS.contains(&ext.to_string()) {
+            Err(eyre!(
+                "Invalid `slate_url` file extension. Valid values are: {}",
+                SLATE_URL_FILE_EXTENSIONS.join(", "),
+            ))
+        } else if !SLATE_URL_SCHEMES.contains(&scheme.to_string()) {
+            Err(eyre!(
+                "Invalid `slate_url` URL scheme. Valid values are: {}",
+                SLATE_URL_SCHEMES.join(", "),
+            ))
+        } else {
+            Ok(())
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Copy, Clone, Debug, Eq, PartialEq)]

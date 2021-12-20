@@ -15,6 +15,7 @@ use warp::http::header::{CACHE_CONTROL, CONTENT_TYPE};
 use warp::http::{HeaderValue, StatusCode};
 use warp::hyper::Body;
 use warp::reply;
+use crate::filters::ErrorResponse;
 
 pub async fn list_watchers(client: Client) -> Result<impl warp::Reply, Infallible> {
     let lp = ListParams::default()
@@ -61,6 +62,18 @@ pub async fn create_watcher(
     log::debug!("v1.create_watcher: {:?}", watcher);
     log::warn!("Watcher Controller valid: {:?}", watcher.is_valid());
 
+    if let Some(err) = watcher.is_valid().err() {
+        let fe: ErrorResponse = err.into();
+        return Ok(reply::with_status(
+            reply::json(&fe),
+            StatusCode::UNPROCESSABLE_ENTITY,
+        ))
+        // TODO: we can return Ok(fe) here if we remove the reply::json below. With both enabled,
+        // the compile will error since the return type of Ok(fe) and the reply::with_status below
+        // are two different types.
+        // return Ok(fe)
+    }
+
     let new_id = Uuid::new_v4().to_string();
     watcher.id = Some(new_id.clone());
     let pp = PostParams::default();
@@ -89,6 +102,8 @@ pub async fn create_watcher(
 
     watcher.status = Some(Status::Pending);
     watcher.source.ingest_ip = None;
+
+    // Ok(FieldError::new("hi there"))
 
     Ok(reply::with_status(
         reply::json(&watcher),

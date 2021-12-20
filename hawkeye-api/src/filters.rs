@@ -1,9 +1,13 @@
+use std::fmt::Display;
 use crate::{auth, handlers};
+use eyre::ErrReport;
 use hawkeye_core::models::Watcher;
 use kube::Client;
-use serde::Serialize;
+use serde::{Serialize, Serializer};
+use serde::ser::SerializeStruct;
 use warp::hyper::StatusCode;
-use warp::Filter;
+use warp::{Filter, reject};
+use warp::reply::Response;
 
 /// API root for v1
 pub fn v1(
@@ -42,6 +46,9 @@ pub fn watcher_create(
         .and(json_body())
         .and(with_client(client))
         .and_then(handlers::create_watcher)
+
+        // .or_else(|e| Err(warp::reject::custom(e.into())))
+        // .or_else(|e| Err(warp::reject::custom::<FieldError>(e.into())))
 }
 
 /// GET /v1/watchers/{id}
@@ -132,18 +139,68 @@ fn json_body() -> impl Filter<Extract = (Watcher,), Error = warp::Rejection> + C
 }
 
 /// An API error serializable to JSON.
-#[derive(Serialize)]
-struct ErrorResponse {
-    message: String,
+#[derive(Debug, Clone, PartialEq)]
+pub struct ErrorResponse {
+    pub message: String,
+}
+
+// #[derive(Debug, Clone, PartialEq)]
+// pub struct FieldError {
+//     message: String,
+// }
+
+impl reject::Reject for ErrorResponse {}
+
+impl Display for ErrorResponse {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", self.message)
+    }
+}
+
+impl ErrorResponse {
+    pub fn new<S: AsRef<str>>(message: S) -> Self {
+        Self {
+            message: message.as_ref().to_string(),
+        }
+    }
+}
+
+impl Serialize for ErrorResponse {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut state = serializer.serialize_struct("ErrorResponse", 2)?;
+        state.serialize_field("message", &self.message)?;
+        // state.serialize_field("code", &self.code.as_u16())?;
+        state.end()
+    }
+}
+
+impl From<eyre::ErrReport> for ErrorResponse {
+    fn from(err: ErrReport) -> Self {
+        let e = match err.downcast::<ErrorResponse>() {
+            Ok(e) => return e,
+            Err(e) => e,
+        };
+
+        ErrorResponse::new(e.to_string().as_str())
+    }
+}
+
+impl warp::Reply for ErrorResponse {
+    fn into_response(self) -> Response {
+        let json = warp::reply::json(&self);
+        warp::reply::with_status(json, StatusCode::UNPROCESSABLE_ENTITY).into_response()
+    }
 }
 
 async fn handle_rejection(
     err: warp::Rejection,
 ) -> Result<impl warp::Reply, std::convert::Infallible> {
+    log::debug!("Rejection = {:?}", err);
     let mut message= "".to_string();
     let code;
-
-    log::debug!("Rejection = {:?}", err);
 
     if err.is_not_found() {
         code = StatusCode::NOT_FOUND;
@@ -152,6 +209,9 @@ async fn handle_rejection(
         message = err.to_string();
     } else if err.find::<auth::NoAuth>().is_some() {
         code = StatusCode::UNAUTHORIZED;
+    } else if let Some(e) = err.find::<ErrorResponse>() {
+        code = StatusCode::UNPROCESSABLE_ENTITY;
+        message = e.message.to_owned();
     } else if let Some(missing) = err.find::<warp::reject::MissingHeader>() {
         if missing.name() == "authorization" {
             code = StatusCode::UNAUTHORIZED;

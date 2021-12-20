@@ -12,7 +12,7 @@ use gst::element_error;
 use gst::prelude::*;
 use gstreamer as gst;
 use gstreamer_app as gst_app;
-use hawkeye_core::models::{Codec, Container, VideoMode};
+use hawkeye_core::models::{Codec, Container, SlateContext, VideoMode};
 use lazy_static::lazy_static;
 use log::{debug, info};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -43,7 +43,7 @@ pub fn process_frames(
     frame_source: impl Iterator<Item = Result<Option<Vec<u8>>>>,
     slate_detector: SlateDetector,
     running: Arc<AtomicBool>,
-    action_sink: Sender<Event>,
+    action_sink: Sender<Lyle>,
 ) -> Result<()> {
     log::debug!("process_frames called...");
 
@@ -73,7 +73,7 @@ pub fn process_frames(
             }
         };
 
-        let is_black = Some(black_detector.matched_slate(local_buffer.as_slice())).is_some();
+        let is_black = black_detector.matched_slate(local_buffer.as_slice()).is_some();
         log::debug!("process_frames is_black={}", is_black);
 
         let mut matched_slate: Option<&Slate> = None;
@@ -81,7 +81,7 @@ pub fn process_frames(
         if !is_black {
             let t = SIMILARITY_EXECUTION_DURATION.start_timer();
 
-            matched_slate = Some(slate_detector.matched_slate(local_buffer.as_slice()));
+            matched_slate = slate_detector.matched_slate(local_buffer.as_slice());
 
             // is_match will be the result of
 
@@ -102,15 +102,22 @@ pub fn process_frames(
             continue;
         }
 
+        let slate_context = matched_slate
+            .and_then(|s| s.transition.as_ref())
+            .and_then(|t| t.to_context.as_ref())
+            .and_then(|tc| tc.slate_context.clone());
+
         // If the frame matched a slate, then start the Slate workflow.
         if matched_slate.is_some() {
             log::trace!("Found slate image in video stream!");
             FOUND_SLATE_COUNTER.inc();
-            action_sink.send(Event::Mode(VideoMode::Slate)).unwrap();
+            let blah = Lyle::new(Event::Mode(VideoMode::Slate), slate_context);
+            action_sink.send(blah).unwrap();
         } else {
             log::trace!("Content in video stream!");
             FOUND_CONTENT_COUNTER.inc();
-            action_sink.send(Event::Mode(VideoMode::Content)).unwrap();
+            let blah = Lyle::new(Event::Mode(VideoMode::Content), slate_context);
+            action_sink.send(blah).unwrap();
         }
 
         SIMILARITY_EXECUTION_COUNTER.inc();
@@ -126,7 +133,7 @@ pub fn process_frames(
     }
 
     info!("Stopping pipeline gracefully!");
-    action_sink.send(Event::Terminate)?;
+    // action_sink.send(Event::Terminate)?;
 
     Ok(())
 }
@@ -353,5 +360,20 @@ impl Drop for VideoStreamIterator {
             log::error!("Could not stop pipeline");
         }
         log::debug!("Pipeline stopped!");
+    }
+}
+
+#[derive(Debug, Eq, PartialEq)]
+pub struct Lyle {
+    pub event: Event,
+    pub slate_context: Option<SlateContext>,
+}
+
+impl Lyle {
+    pub fn new(event: Event, slate_context: Option<SlateContext>) -> Self {
+        Self {
+            event,
+            slate_context,
+        }
     }
 }

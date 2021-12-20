@@ -1167,6 +1167,7 @@ name = "hawkeye-api"
 version = "0.1.1"
 dependencies = [
  "anyhow",
+ "eyre",
  "hawkeye-core",
  "k8s-openapi",
  "kube",
@@ -1187,6 +1188,7 @@ name = "hawkeye-core"
 version = "0.1.0"
 dependencies = [
  "color-eyre",
+ "lazy_static",
  "log",
  "pretty_assertions",
  "serde",

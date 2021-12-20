@@ -2,10 +2,10 @@ use crate::metrics::{
     HTTP_CALL_DURATION, HTTP_CALL_ERROR_COUNTER, HTTP_CALL_RETRIED_COUNT,
     HTTP_CALL_RETRIES_EXHAUSTED_COUNT, HTTP_CALL_SUCCESS_COUNTER,
 };
-use crate::video_stream::Event;
+use crate::video_stream::{Event, Lyle};
 use color_eyre::Result;
 use crossbeam::channel::Receiver;
-use hawkeye_core::models::{self, Action, HttpAuth, HttpCall, VideoMode};
+use hawkeye_core::models::{self, Action, HttpAuth, HttpCall, SlateContext, VideoMode};
 use log::{debug, error, info, warn};
 use std::time::Duration;
 
@@ -30,34 +30,34 @@ impl ActionExecution for Action {
 
 /// Represents a sequence of video modes.
 #[derive(Clone, Eq, PartialEq)]
-pub struct Transition(VideoMode, VideoMode);
+pub struct TransitionChange(VideoMode, Option<SlateContext>, VideoMode, Option<SlateContext>);
 
 /// Manages the execution of an `Action` based on a flow of `VideoMode`s.
 ///
 /// The `ActionExecutor` abstracts the logic of execution that is inherent to all `Action` types.
 pub struct ActionExecutor {
-    transition: Transition,
+    transition_change: TransitionChange,
     action: Action,
     last_mode: Option<VideoMode>,
+    last_context: Option<SlateContext>,
     last_call: Option<Instant>,
 }
 
 impl ActionExecutor {
     /// Creates a new `ActionExecutor` instance
-    pub fn new(transition: Transition, action: Action) -> Self {
+    pub fn new(transition_change: TransitionChange, action: Action) -> Self {
         Self {
-            transition,
+            transition_change,
             action,
             last_mode: None,
+            last_context: None,
             last_call: None,
         }
     }
 
     // Manage the execution of an action based on the provided video mode.
-    // pub fn execute(&mut self, transition: models::Transition) {
-    //     if let Some(result) = self.call_action(&transition) {
-    pub fn execute(&mut self, mode: VideoMode) {
-        if let Some(result) = self.call_action(mode) {
+    pub fn execute(&mut self, mode: VideoMode, slate_context: Option<SlateContext>) {
+        if let Some(result) = self.call_action(mode, &slate_context) {
             match result {
                 Ok(_) => self.last_call = Some(Instant::now()),
                 Err(err) => error!(
@@ -67,17 +67,14 @@ impl ActionExecutor {
             }
         }
         self.last_mode = Some(mode);
-        // self.last_transition = Some(transition)
+        self.last_context = slate_context.clone();
     }
 
     /// Executes the action if the video mode matches the transition and if the action is
     /// allowed to run.
-    ///     fn call_action(&mut self, current_transition: &models::Transition) -> Option<Result<()>> {
-    //         self.last_transition.and_then(|current_transition| {
-    //             if self.allowed_to_run() && TransitionStateChange(last_transition, current_transition) == self.transition {
-    fn call_action(&mut self, mode: VideoMode) -> Option<Result<()>> {
+    fn call_action(&mut self, mode: VideoMode, slate_context: &Option<SlateContext>) -> Option<Result<()>> {
         self.last_mode.and_then(|last_mode| {
-            if Transition(last_mode, mode) == self.transition && self.allowed_to_run() {
+            if TransitionChange(last_mode, self.last_context.clone(), mode, slate_context.clone()) == self.transition_change && self.allowed_to_run() {
                 Some(self.action.execute())
             } else {
                 None
@@ -104,7 +101,9 @@ pub(crate) struct Executors(pub(crate) Vec<ActionExecutor>);
 /// Convert a Transition to a Vec<ActionExecutors>
 impl From<models::Transition> for Executors {
     fn from(transition: models::Transition) -> Self {
-        let target_transition = Transition(transition.from, transition.to);
+        let from_slate_context = transition.from_context.and_then(|fc| fc.slate_context);
+        let to_slate_context = transition.to_context.and_then(|tc| tc.slate_context);
+        let target_transition = TransitionChange(transition.from, from_slate_context, transition.to, to_slate_context);
         Self(
             transition
                 .actions
@@ -116,12 +115,12 @@ impl From<models::Transition> for Executors {
 }
 
 pub struct Runtime {
-    receiver: Receiver<Event>,
+    receiver: Receiver<Lyle>,
     actions: Vec<ActionExecutor>,
 }
 
 impl Runtime {
-    pub fn new(receiver: Receiver<Event>, processors: Vec<ActionExecutor>) -> Self {
+    pub fn new(receiver: Receiver<Lyle>, processors: Vec<ActionExecutor>) -> Self {
         Runtime {
             receiver,
             actions: processors,
@@ -130,11 +129,13 @@ impl Runtime {
 
     pub fn run_blocking(&mut self) -> Result<()> {
         loop {
-            match self.receiver.recv()? {
+            let msg = self.receiver.recv()?;
+
+            match msg.event {
                 Event::Terminate => break,
                 Event::Mode(mode) => {
                     for p in self.actions.iter_mut() {
-                        p.execute(mode);
+                        p.execute(mode, msg.slate_context.clone());
                     }
                 }
             }

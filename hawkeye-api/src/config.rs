@@ -15,19 +15,20 @@ const DEFAULT_CALL_WATCHER_TIMEOUT: u64 = 2;
 lazy_static! {
     /// Kubernetes namespace where the resources are managed (created/deleted/updated)
     pub static ref NAMESPACE: String =
-        std::env::var(NAMESPACE_ENV).unwrap_or_else(|_| "default".into());
+        std::env::var(NAMESPACE_ENV).unwrap_or("default".into());
 
     /// The docker image of the "hawkeye-worker" to be used in the K8s Deployment resource template
     pub static ref DOCKER_IMAGE: String =
-        std::env::var(DOCKER_IMAGE_ENV).unwrap_or_else(|_| "hawkeye-dev:latest".into());
+        std::env::var(DOCKER_IMAGE_ENV).unwrap_or("hawkeye-dev:latest".into());
 
     /// A fixed authentication token required by clients while calling the Hawkeye API
     pub static ref FIXED_TOKEN: String =
-        std::env::var(FIXED_TOKEN_ENV).unwrap_or_else(|_| gen_token());
+        std::env::var(FIXED_TOKEN_ENV).unwrap_or(gen_token());
 
     pub static ref CALL_WATCHER_TIMEOUT: u64 =
         std::env::var(CALL_WATCHER_TIMEOUT_ENV).map(|val| val.parse::<u64>()).unwrap_or_else(|_| Ok(DEFAULT_CALL_WATCHER_TIMEOUT)).unwrap_or(DEFAULT_CALL_WATCHER_TIMEOUT);
 
+    // pub static ref SLATE_URL_FILE_EXTENSIONS: Vec<&str> = std::env::var(SLATE_URL_FILE_EXTENSIONS_ENV).unwrap_or_else(|s| "http,https").as_str().split(",").collect()
 }
 
 /// In case the environment variable `HAWKEYE_FIXED_TOKEN` is not present, a

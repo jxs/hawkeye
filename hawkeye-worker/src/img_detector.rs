@@ -8,7 +8,7 @@ pub struct Slate {
     slate: DssimImage<f32>,
     similarity_algorithm: dssim::Dssim,
     // TODO: This should probably be a ref. Needs a lifetime specifier.
-    transition: Option<Transition>,
+    pub(crate) transition: Option<Transition>,
 }
 
 impl Slate {
@@ -39,6 +39,12 @@ impl Slate {
     }
 }
 
+// impl fmt::Display for Slate {
+//     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+//
+//     }
+// }
+
 /// Provide functionality to match a set of slates to an incoming image_buffer, typically from a
 /// frame in a stream of video.
 pub struct SlateDetector {
@@ -58,20 +64,26 @@ impl SlateDetector {
         })
     }
 
-    pub fn matched_slate(&self, image_buffer: &[u8]) -> &Slate {
+    pub fn matched_slate(&self, image_buffer: &[u8]) -> Option<&Slate> {
         // since we are doing the work to grab the image buffer frame, we should compare all slates here?
         let frame_img = load_data(image_buffer).unwrap();
         let frame = self.similarity_algorithm.create_image(&frame_img).unwrap();
 
-        self.slates
+       self.slates
             .iter()
             .find_map(|slate| {
+
+
+
                 match slate.is_match(&frame) {
-                    true => Some(slate),
-                    _ => None,
+                    true => {
+                        Some(slate)
+                    },
+                    false => {
+                        None
+                    },
                 }
             })
-            .unwrap()
     }
 }
 
