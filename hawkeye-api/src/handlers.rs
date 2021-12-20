@@ -60,8 +60,8 @@ pub async fn create_watcher(
     client: Client,
 ) -> Result<impl warp::Reply, Infallible> {
     log::debug!("v1.create_watcher: {:?}", watcher);
-    log::warn!("Watcher Controller valid: {:?}", watcher.is_valid());
 
+    // TODO: THis could use another iteration to make it happen more automatically.
     if let Some(err) = watcher.is_valid().err() {
         let fe: ErrorResponse = err.into();
         return Ok(reply::with_status(

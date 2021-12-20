@@ -95,17 +95,35 @@ pub struct Transition {
 
 impl Transition {
     fn is_valid(&self) -> Result<()> {
+        self._validate_from_context()
+            .and(self._validate_to_context())
+    }
+
+    fn _validate_from_context(&self) -> Result<()> {
         if self.from == Slate {
              match self.from_context.as_ref() {
-                Some(fc) => {
-                    fc.is_valid(&self.from)
-                },
+                Some(fc) => fc.is_valid(&self.from),
                 None => Err(eyre!("A `from_context` is required for from=Slate")),
             }
         } else {
             // FromContext is only valid for from=slate at the moment.
-            match &self.from_context {
+            match self.from_context {
                 Some(_) => Err(eyre!("A `from_context` is not supported for the `from` state of {:?}", self.from)),
+                None => Ok(()),
+            }
+        }
+    }
+
+    fn _validate_to_context(&self) -> Result<()> {
+        if self.to == Slate {
+             match self.to_context.as_ref() {
+                Some(fc) => fc.is_valid(&self.from),
+                None => Err(eyre!("A `to_context` is required for to=Slate")),
+            }
+        } else {
+            // ToContext is only valid for to=slate at the moment.
+            match self.to_context {
+                Some(_) => Err(eyre!("A `to_context` is not supported for the `to` state of {:?}", self.to)),
                 None => Ok(()),
             }
         }
