@@ -10,13 +10,12 @@ repository = "https://github.com/cbsinteractive/hawkeye"
 [dependencies]
 hawkeye-core = { path = "../hawkeye-core" }
 image = "0.23"
-glib = "0.10.1"
-gstreamer = "0.16.2"
-gstreamer-app = "0.16.0"
-gstreamer-video = "0.16.0"
+glib = "0.14.8"
+gstreamer = "0.17.4"
+gstreamer-app = "0.17.2"
 derive_more = "0.99.9"
 dssim = "2.11"
-load_image = { version = "2.12", features = ["static"] }
+load_image = { version = "2.15", features = ["static"] }
 imgref = "1.7"
 structopt = "0.3"
 color-eyre = "0.5"
@@ -28,7 +27,7 @@ ctrlc = { version = "3.1", features = ["termination"] }
 prometheus = "0.10.0"
 lazy_static = "1.4.0"
 tokio = { version = "1.14", features = ["full"] }
-warp = "0.2"
+warp = "0.3"
 concread = "0.2.1"
 crossbeam = "0.8.0"
 rand = "0.8"
