@@ -729,9 +729,9 @@ checksum = "fea41bba32d969b513997752735605054bc0dfa92b4c56bf1189f2e174be7a10"
 
 [[package]]
 name = "dssim"
-version = "3.1.0"
+version = "2.11.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9df146ff1050d29ee8f86cd431bf472992e538017c5b8b5a556b18fe8465a936"
+checksum = "f1dda112e33d6a395df84d07a52d9835a2fe077076cfe694b5abbf764f57bba3"
 dependencies = [
  "dssim-core",
  "getopts",
@@ -744,9 +744,9 @@ dependencies = [
 
 [[package]]
 name = "dssim-core"
-version = "3.1.0"
+version = "2.11.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e74bb95630a0294f1b6db11919575f702210fd7b791b576abc12b418ce743ed8"
+checksum = "ba2443cbe633d33d180719a96dd6d75f32b933fb032149a98b6ea3bb8bf1c3bf"
 dependencies = [
  "imgref",
  "itertools",
