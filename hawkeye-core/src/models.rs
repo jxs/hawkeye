@@ -9,25 +9,6 @@ use crate::models::VideoMode::Slate;
 use crate::config::{SLATE_URL_FILE_EXTENSIONS, SLATE_URL_SCHEMES};
 
 
-// const VALID_SCHEMES: [&str; 2] = [
-//     "http",
-//     "https",
-// ];
-
-// lazy_static! {
-//     static ref VALID_SCHEMES: [&str; 2] = [
-//         "http",
-//         "https",
-//     ];
-// }
-
-// const VALID_FILE_EXTENSIONS: [&str; 3] = [
-//     "jpg",
-//     "jpeg",
-//     "png",
-// ];
-
-
 #[skip_serializing_none]
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
 pub struct Watcher {
