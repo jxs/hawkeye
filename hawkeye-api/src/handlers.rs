@@ -292,7 +292,7 @@ pub async fn get_video_frame(id: String, client: Client) -> Result<impl warp::Re
         }
     };
     if Status::Running != deployment.get_watcher_status() {
-        log::debug!("Watcher is not running..");
+        log::debug!("Watcher is not running...");
         *resp.status_mut() = StatusCode::NOT_ACCEPTABLE;
         return Ok(resp);
     }
@@ -472,7 +472,7 @@ pub async fn stop_watcher(id: String, client: Client) -> Result<impl warp::Reply
         )),
         Status::Pending => Ok(reply::with_status(
             reply::json(&json!({
-                "message": "Watcher is already updating"
+                "message": "Watcher is updating"
             })),
             StatusCode::CONFLICT,
         )),
