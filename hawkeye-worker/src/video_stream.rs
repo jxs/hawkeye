@@ -134,6 +134,8 @@ pub fn process_frames(
 
     info!("Stopping pipeline gracefully!");
     // action_sink.send(Event::Terminate)?;
+    let blah = Lyle::new(Event::Terminate, None);
+    action_sink.send(blah)?;
 
     Ok(())
 }

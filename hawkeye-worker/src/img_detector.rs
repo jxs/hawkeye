@@ -88,7 +88,7 @@ impl SlateDetector {
 }
 
 fn load_data(data: &[u8]) -> Result<ImgVec<RGBAPLU>> {
-    let img = load_image::load_image_data(data, false)?;
+    let img = load_image::load_data(data)?;
     Ok(match_img_bitmap(img))
 }
 

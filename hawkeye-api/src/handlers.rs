@@ -103,8 +103,6 @@ pub async fn create_watcher(
     watcher.status = Some(Status::Pending);
     watcher.source.ingest_ip = None;
 
-    // Ok(FieldError::new("hi there"))
-
     Ok(reply::with_status(
         reply::json(&watcher),
         StatusCode::CREATED,

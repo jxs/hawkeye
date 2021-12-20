@@ -19,7 +19,7 @@ lazy_static! {
 
     /// The docker image of the "hawkeye-worker" to be used in the K8s Deployment resource template
     pub static ref DOCKER_IMAGE: String =
-        std::env::var(DOCKER_IMAGE_ENV).unwrap_or("hawkeye-dev:latest".into());
+        std::env::var(DOCKER_IMAGE_ENV).unwrap_or("hawkeye-worker:latest".into());
 
     /// A fixed authentication token required by clients while calling the Hawkeye API
     pub static ref FIXED_TOKEN: String =
