@@ -99,9 +99,10 @@ fn latest_frame() -> impl warp::Reply {
 }
 
 pub fn run_metrics_service(metrics_port: u16) {
-    let runtime = Builder::new_multi_thread()
+    let mut runtime = Builder::new()
+        .threaded_scheduler()
         .thread_name("metrics_app")
-        .max_blocking_threads(2)
+        .max_threads(2)
         .enable_all()
         .build()
         .unwrap();
