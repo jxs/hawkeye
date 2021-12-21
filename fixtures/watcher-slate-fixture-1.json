@@ -1,0 +1,200 @@
+{
+  "id": "4e251c33-8b34-4d42-9461-58aae0086ac4",
+  "description": "lyles test asset",
+  "status": "running",
+  "source": {
+    "ingest_port": 5002,
+    "container": "mpeg-ts",
+    "codec": "h264",
+    "transport": {
+      "protocol": "rtp"
+    }
+  },
+  "transitions": [
+
+
+    {
+      "from": "content",
+      "to": "slate",
+      "to_context": {
+        "slate_context": {
+          "slate_url": "file://./resources/slate_120px.jpg"
+        }
+      },
+      "actions": [
+        {
+          "description": "Trigger AdBreak using API",
+          "type": "http_call",
+          "method": "POST",
+          "retries": 3,
+          "timeout": 10,
+          "url": "http://localhost:4200/t1/from:content/to:slate/slate_120px.jpg",
+          "authorization": {
+            "basic": {
+              "username": "dev_user",
+              "password": "something"
+            }
+          },
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": "{\"duration\":300}"
+        }
+      ]
+    },
+    {
+      "from": "content",
+      "to": "slate",
+      "to_context": {
+        "slate_context": {
+          "slate_url": "file://./resources/slate_fixtures/slate-1-230x130.png"
+        }
+      },
+      "actions": [
+        {
+          "description": "Trigger AdBreak using API",
+          "type": "http_call",
+          "method": "GET",
+          "retries": 3,
+          "timeout": 10,
+          "url": "http://localhost:4200/t2/from:content/to:slate/slate-1-230x130.png",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": "{\"foo\":\"bar\"}"
+        }
+      ]
+    },
+    {
+      "from": "content",
+      "to": "slate",
+      "to_context": {
+        "slate_context": {
+          "slate_url": "file://./resources/slate_fixtures/slate-2-230x130.jpg"
+        }
+      },
+      "actions": [
+        {
+          "description": "Trigger AdBreak using API",
+          "type": "http_call",
+          "method": "PATCH",
+          "retries": 3,
+          "timeout": 10,
+          "url": "http://localhost:4200/t3/from:content/to:slate/slate-2-230x130.jpg",
+          "body": "{\"updated\":\"field\"}"
+        }
+      ]
+    },
+    {
+      "from": "content",
+      "to": "slate",
+      "to_context": {
+        "slate_context": {
+          "slate_url": "file://./resources/slate_fixtures/slate-3-230x130.jpeg"
+        }
+      },
+      "actions": [
+        {
+          "description": "Trigger AdBreak using API",
+          "type": "http_call",
+          "method": "DELETE",
+          "url": "http://localhost:4200/t4/from:content/to:slate/slate-3-230x130.jpeg"
+        }
+      ]
+    },
+
+
+
+    {
+      "from": "slate",
+      "from_context": {
+        "slate_context": {
+          "slate_url": "file://./resources/slate_120px.jpg"
+        }
+      },
+      "to": "content",
+      "actions": [
+        {
+          "description": "Trigger AdBreak using API",
+          "type": "http_call",
+          "method": "POST",
+          "retries": 3,
+          "timeout": 10,
+          "url": "http://localhost:4200/t5/from:slate/to:content/slate_120px.jpg",
+          "authorization": {
+            "basic": {
+              "username": "dev_user",
+              "password": "something"
+            }
+          },
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": "{\"duration\":300}"
+        }
+      ]
+    },
+    {
+      "from": "slate",
+      "from_context": {
+        "slate_context": {
+          "slate_url": "file://./resources/slate_fixtures/slate-1-230x130.png"
+        }
+      },
+      "to": "content",
+      "actions": [
+        {
+          "description": "Trigger AdBreak using API",
+          "type": "http_call",
+          "method": "GET",
+          "retries": 3,
+          "timeout": 10,
+          "url": "http://localhost:4200/t6/from:slate/to:content/slate-1-230x130.png",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": "{\"foo\":\"bar\"}"
+        }
+      ]
+    },
+    {
+      "from": "slate",
+      "from_context": {
+        "slate_context": {
+          "slate_url": "file://./resources/slate_fixtures/slate-2-230x130.jpg"
+        }
+      },
+      "to": "content",
+      "actions": [
+        {
+          "description": "Trigger AdBreak using API",
+          "type": "http_call",
+          "method": "PATCH",
+          "retries": 3,
+          "timeout": 10,
+          "url": "http://localhost:4200/t7/from:slate/to:content/slate-2-230x130.jpg",
+          "body": "{\"updated\":\"field\"}"
+        }
+      ]
+    },
+    {
+      "from": "slate",
+      "from_context": {
+        "slate_context": {
+          "slate_url": "file://./resources/slate_fixtures/slate-3-230x130.jpeg"
+        }
+      },
+      "to": "content",
+      "actions": [
+        {
+          "description": "Trigger AdBreak using API",
+          "type": "http_call",
+          "method": "DELETE",
+          "retries": 3,
+          "timeout": 10,
+          "url": "http://localhost:4200/t8/from:slate/to:content/slate-3-230x130.jpeg"
+        }
+      ]
+    }
+  ]
+}

@@ -3,7 +3,7 @@
   "description": "UEFA 2020 - Lyon vs. Bayern",
   "status": "running",
   "source": {
-    "ingest_port": 5000,
+    "ingest_port": 5001,
     "container": "mpeg-ts",
     "codec": "h264",
     "transport": {
@@ -15,9 +15,9 @@
       "from": "content",
       "to": "slate",
       "to_context": {
-          "slate_context": {
-              "slate_url": "file://./resources/slate_120px.jpg"
-          }
+        "slate_context": {
+          "slate_url": "file://./resources/slate_120px.jpg"
+        }
       },
       "actions": [
         {
@@ -43,9 +43,9 @@
     {
       "from": "slate",
       "from_context": {
-          "slate_context": {
-              "slate_url": "file://./resources/slate_120px.jpg"
-          }
+        "slate_context": {
+          "slate_url": "file://./resources/slate_120px.jpg"
+        }
       },
       "to": "content",
       "actions": [
