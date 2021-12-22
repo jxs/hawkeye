@@ -382,7 +382,7 @@ pub async fn start_watcher(id: String, client: Client) -> Result<impl warp::Repl
         Status::Pending => Ok(reply::with_status(
             // No op, committing other changes.
             reply::json(&json!({
-                "message": "Watcher is updating"
+                "message": "Watcher is currently updating"
             })),
             StatusCode::CONFLICT,
         )),
@@ -466,7 +466,7 @@ pub async fn stop_watcher(id: String, client: Client) -> Result<impl warp::Reply
         )),
         Status::Pending => Ok(reply::with_status(
             reply::json(&json!({
-                "message": "Watcher is updating"
+                "message": "Watcher is currently updating"
             })),
             StatusCode::CONFLICT,
         )),
