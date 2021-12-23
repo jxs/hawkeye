@@ -1,3 +1,5 @@
+use crate::config::{SLATE_URL_FILE_EXTENSIONS, SLATE_URL_SCHEMES};
+use crate::models::VideoMode::Slate;
 use color_eyre::{eyre::eyre, Result};
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
@@ -5,9 +7,6 @@ use std::collections::HashMap;
 use std::ffi::OsStr;
 use std::path::Path;
 use url::Url;
-use crate::models::VideoMode::Slate;
-use crate::config::{SLATE_URL_FILE_EXTENSIONS, SLATE_URL_SCHEMES};
-
 
 #[skip_serializing_none]
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
@@ -23,7 +22,8 @@ pub struct Watcher {
 impl Watcher {
     pub fn is_valid(&self) -> Result<()> {
         log::error!("Watcher is_valid called...");
-        self.transitions.clone()
+        self.transitions
+            .clone()
             .into_iter()
             .try_for_each(|t| t.is_valid())
             // Validate the source.
@@ -101,14 +101,17 @@ impl Transition {
 
     fn _validate_from_context(&self) -> Result<()> {
         if self.from == Slate {
-             match self.from_context.as_ref() {
+            match self.from_context.as_ref() {
                 Some(fc) => fc.is_valid(&self.from),
                 None => Err(eyre!("A `from_context` is required for from=Slate")),
             }
         } else {
             // FromContext is only valid for from=slate at the moment.
             match self.from_context {
-                Some(_) => Err(eyre!("A `from_context` is not supported for the `from` state of {:?}", self.from)),
+                Some(_) => Err(eyre!(
+                    "A `from_context` is not supported for the `from` state of {:?}",
+                    self.from
+                )),
                 None => Ok(()),
             }
         }
@@ -116,14 +119,17 @@ impl Transition {
 
     fn _validate_to_context(&self) -> Result<()> {
         if self.to == Slate {
-             match self.to_context.as_ref() {
+            match self.to_context.as_ref() {
                 Some(fc) => fc.is_valid(&self.from),
                 None => Err(eyre!("A `to_context` is required for to=Slate")),
             }
         } else {
             // ToContext is only valid for to=slate at the moment.
             match self.to_context {
-                Some(_) => Err(eyre!("A `to_context` is not supported for the `to` state of {:?}", self.to)),
+                Some(_) => Err(eyre!(
+                    "A `to_context` is not supported for the `to` state of {:?}",
+                    self.to
+                )),
                 None => Ok(()),
             }
         }
@@ -175,7 +181,10 @@ impl SlateContext {
     fn is_valid(&self) -> Result<()> {
         // Validate slate_url particulars.
         let parsed = Url::parse(&self.slate_url)?;
-        let ext = Path::new(parsed.path()).extension().and_then(OsStr::to_str).unwrap();
+        let ext = Path::new(parsed.path())
+            .extension()
+            .and_then(OsStr::to_str)
+            .unwrap();
         let scheme = parsed.scheme();
 
         if !SLATE_URL_FILE_EXTENSIONS.contains(&ext.to_string()) {
@@ -299,7 +308,7 @@ mod tests {
             status_description: None,
             source: Source {
                 ingest_ip: None,
-                ingest_port: 5000,
+                ingest_port: 5001,
                 container: Container::MpegTs,
                 codec: Codec::H264,
                 transport: Protocol::Rtp
@@ -307,13 +316,13 @@ mod tests {
             transitions: vec![
                 Transition {
                     from: VideoMode::Content,
-                    from_context: FromContext{
-                        slate_url: "file://./resources/slate_120px.jpg".to_string()
-                    },
+                    from_context: None,
                     to: VideoMode::Slate,
-                    to_context: ToContext {
-                        slate_url: "file://./resources/slate_120px.jpg".to_string()
-                    },
+                    to_context: Option::from(ToContext {
+                        slate_context: Option::from(SlateContext {
+                            slate_url: "file://./resources/slate_120px.jpg".to_string()
+                        })
+                    }),
                     actions: vec![
                         Action::HttpCall( HttpCall {
                             description: Some("Trigger AdBreak using API".to_string()),
@@ -331,9 +340,15 @@ mod tests {
                     ]
                 },
                 Transition {
-                    from: VideoMode::Slate,
-                    to: VideoMode::Content,
-                    actions: vec![
+                from: VideoMode::Slate,
+                from_context: Option::from(FromContext {
+                    slate_context: Option::from(SlateContext {
+                        slate_url: "file://./resources/slate_120px.jpg".to_string()
+                    })
+                }),
+                to: VideoMode::Content,
+                to_context: None,
+                actions: vec ![
                         Action::HttpCall( HttpCall {
                             description: Some("Use dump out of AdBreak API call".to_string()),
                             method: HttpMethod::DELETE,
@@ -354,12 +369,39 @@ mod tests {
     }
 
     #[test]
-    fn check_slate_url_is_url() {
-        let mut w = get_watcher();
-        assert!(w.is_valid().is_ok());
+    fn check_slate_url_accepts_valid_url() {
+        let slate_context = SlateContext {
+            slate_url: "http://bar.baz/zing.png".to_string(),
+        };
+        assert!(slate_context.is_valid().is_ok());
+    }
 
-        w.slate_url = String::from("something else");
-        assert!(w.is_valid().is_err());
+    #[test]
+    fn check_slate_url_validates_scheme() {
+        let slate_context = SlateContext {
+            slate_url: "foo://bar.baz/zing.png".to_string(),
+        };
+        assert!(slate_context.is_valid().is_err());
+        assert!(slate_context
+            .is_valid()
+            .err()
+            .unwrap()
+            .to_string()
+            .contains(&"URL scheme"));
+    }
+
+    #[test]
+    fn check_slate_url_validates_extension() {
+        let slate_context = SlateContext {
+            slate_url: "http://bar.baz/zing.foobar".to_string(),
+        };
+        assert!(slate_context.is_valid().is_err());
+        assert!(slate_context
+            .is_valid()
+            .err()
+            .unwrap()
+            .to_string()
+            .contains(&"file extension"));
     }
 
     #[test]
@@ -373,7 +415,8 @@ mod tests {
 
     #[test]
     fn deserialize_as_expected() {
-        let mut fixture = File::open("../fixtures/watcher.json").expect("Fixture was not found!");
+        let mut fixture =
+            File::open("../fixtures/watcher-basic.json").expect("Fixture was not found!");
         let mut expected_value = String::new();
         fixture.read_to_string(&mut expected_value).unwrap();
         let expected: Watcher = serde_json::from_str(expected_value.as_str()).unwrap();
@@ -383,7 +426,8 @@ mod tests {
 
     #[test]
     fn serialize_as_expected() {
-        let mut fixture = File::open("../fixtures/watcher.json").expect("Fixture was not found!");
+        let mut fixture =
+            File::open("../fixtures/watcher-basic.json").expect("Fixture was not found!");
         let mut expected_value = String::new();
         fixture.read_to_string(&mut expected_value).unwrap();
         let fixture: serde_json::Value = serde_json::from_str(expected_value.as_str()).unwrap();

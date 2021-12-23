@@ -50,9 +50,10 @@ fn main() -> Result<()> {
     for transition in watcher.transitions.iter() {
         if let Some(context) = &transition.to_context {
             if let Some(slate_context) = &context.slate_context {
-                to_slates.push(
-                    Slate::new(&slate::load_img(slate_context.slate_url.as_str())?, Some(transition.clone()))?
-                );
+                to_slates.push(Slate::new(
+                    &slate::load_img(slate_context.slate_url.as_str())?,
+                    Some(transition.clone()),
+                )?);
             }
         }
         let mut execs: Executors = transition.clone().into();

@@ -1,8 +1,8 @@
 use color_eyre::Result;
 use dssim::{DssimImage, ToRGBAPLU, RGBAPLU};
+use hawkeye_core::models::Transition;
 use imgref::{Img, ImgVec};
 use load_image::{Image, ImageData};
-use hawkeye_core::models::Transition;
 
 pub struct Slate {
     slate: DssimImage<f32>,
@@ -12,7 +12,6 @@ pub struct Slate {
 }
 
 impl Slate {
-
     /// Create a new Slate using the image bytes and the selected similarity algorithm.
     /// Note: similarity_algorithm can only be `dssim::Dssim` at the moment, so this is essentially
     /// hardcoded in type and value.
@@ -39,12 +38,6 @@ impl Slate {
     }
 }
 
-// impl fmt::Display for Slate {
-//     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-//
-//     }
-// }
-
 /// Provide functionality to match a set of slates to an incoming image_buffer, typically from a
 /// frame in a stream of video.
 pub struct SlateDetector {
@@ -69,20 +62,11 @@ impl SlateDetector {
         let frame_img = load_data(image_buffer).unwrap();
         let frame = self.similarity_algorithm.create_image(&frame_img).unwrap();
 
-       self.slates
+        self.slates
             .iter()
-            .find_map(|slate| {
-
-
-
-                match slate.is_match(&frame) {
-                    true => {
-                        Some(slate)
-                    },
-                    false => {
-                        None
-                    },
-                }
+            .find_map(|slate| match slate.is_match(&frame) {
+                true => Some(slate),
+                false => None,
             })
     }
 }

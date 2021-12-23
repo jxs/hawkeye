@@ -13,6 +13,7 @@
   "transitions": [
     {
       "from": "content",
+      "from_context": null,
       "to": "slate",
       "to_context": {
         "slate_context": {
@@ -48,6 +49,7 @@
         }
       },
       "to": "content",
+      "to_context": null,
       "actions": [
         {
           "description": "Use dump out of AdBreak API call",

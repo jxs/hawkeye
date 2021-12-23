@@ -43,7 +43,7 @@ pub fn process_frames(
     frame_source: impl Iterator<Item = Result<Option<Vec<u8>>>>,
     slate_detector: SlateDetector,
     running: Arc<AtomicBool>,
-    action_sink: Sender<Lyle>,
+    action_sink: Sender<TransitionChange>,
 ) -> Result<()> {
     log::debug!("process_frames called...");
 
@@ -73,7 +73,9 @@ pub fn process_frames(
             }
         };
 
-        let is_black = black_detector.matched_slate(local_buffer.as_slice()).is_some();
+        let is_black = black_detector
+            .matched_slate(local_buffer.as_slice())
+            .is_some();
         log::debug!("process_frames is_black={}", is_black);
 
         let mut matched_slate: Option<&Slate> = None;
@@ -111,12 +113,12 @@ pub fn process_frames(
         if matched_slate.is_some() {
             log::trace!("Found slate image in video stream!");
             FOUND_SLATE_COUNTER.inc();
-            let blah = Lyle::new(Event::Mode(VideoMode::Slate), slate_context);
+            let blah = TransitionChange::new(Event::Mode(VideoMode::Slate), slate_context);
             action_sink.send(blah).unwrap();
         } else {
             log::trace!("Content in video stream!");
             FOUND_CONTENT_COUNTER.inc();
-            let blah = Lyle::new(Event::Mode(VideoMode::Content), slate_context);
+            let blah = TransitionChange::new(Event::Mode(VideoMode::Content), slate_context);
             action_sink.send(blah).unwrap();
         }
 
@@ -134,7 +136,7 @@ pub fn process_frames(
 
     info!("Stopping pipeline gracefully!");
     // action_sink.send(Event::Terminate)?;
-    let blah = Lyle::new(Event::Terminate, None);
+    let blah = TransitionChange::new(Event::Terminate, None);
     action_sink.send(blah)?;
 
     Ok(())
@@ -366,16 +368,13 @@ impl Drop for VideoStreamIterator {
 }
 
 #[derive(Debug, Eq, PartialEq)]
-pub struct Lyle {
+pub struct TransitionChange {
     pub event: Event,
     pub slate_context: Option<SlateContext>,
 }
 
-impl Lyle {
+impl TransitionChange {
     pub fn new(event: Event, slate_context: Option<SlateContext>) -> Self {
-        Self {
-            event,
-            slate_context,
-        }
+        Self {event, slate_context}
     }
 }

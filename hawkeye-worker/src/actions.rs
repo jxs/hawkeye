@@ -2,7 +2,7 @@ use crate::metrics::{
     HTTP_CALL_DURATION, HTTP_CALL_ERROR_COUNTER, HTTP_CALL_RETRIED_COUNT,
     HTTP_CALL_RETRIES_EXHAUSTED_COUNT, HTTP_CALL_SUCCESS_COUNTER,
 };
-use crate::video_stream::{Event, Lyle};
+use crate::video_stream::{Event};
 use color_eyre::Result;
 use crossbeam::channel::Receiver;
 use hawkeye_core::models::{self, Action, HttpAuth, HttpCall, SlateContext, VideoMode};
@@ -30,7 +30,12 @@ impl ActionExecution for Action {
 
 /// Represents a sequence of video modes.
 #[derive(Clone, Eq, PartialEq)]
-pub struct TransitionChange(VideoMode, Option<SlateContext>, VideoMode, Option<SlateContext>);
+pub struct TransitionChange(
+    VideoMode,
+    Option<SlateContext>,
+    VideoMode,
+    Option<SlateContext>,
+);
 
 /// Manages the execution of an `Action` based on a flow of `VideoMode`s.
 ///
@@ -72,9 +77,20 @@ impl ActionExecutor {
 
     /// Executes the action if the video mode matches the transition and if the action is
     /// allowed to run.
-    fn call_action(&mut self, mode: VideoMode, slate_context: &Option<SlateContext>) -> Option<Result<()>> {
+    fn call_action(
+        &mut self,
+        mode: VideoMode,
+        slate_context: &Option<SlateContext>,
+    ) -> Option<Result<()>> {
         self.last_mode.and_then(|last_mode| {
-            if TransitionChange(last_mode, self.last_context.clone(), mode, slate_context.clone()) == self.transition_change && self.allowed_to_run() {
+            if TransitionChange(
+                last_mode,
+                self.last_context.clone(),
+                mode,
+                slate_context.clone(),
+            ) == self.transition_change
+                && self.allowed_to_run()
+            {
                 Some(self.action.execute())
             } else {
                 None
@@ -103,7 +119,12 @@ impl From<models::Transition> for Executors {
     fn from(transition: models::Transition) -> Self {
         let from_slate_context = transition.from_context.and_then(|fc| fc.slate_context);
         let to_slate_context = transition.to_context.and_then(|tc| tc.slate_context);
-        let target_transition = TransitionChange(transition.from, from_slate_context, transition.to, to_slate_context);
+        let target_transition = TransitionChange(
+            transition.from,
+            from_slate_context,
+            transition.to,
+            to_slate_context,
+        );
         Self(
             transition
                 .actions
@@ -115,12 +136,12 @@ impl From<models::Transition> for Executors {
 }
 
 pub struct Runtime {
-    receiver: Receiver<Lyle>,
+    receiver: Receiver<TransitionChange>,
     actions: Vec<ActionExecutor>,
 }
 
 impl Runtime {
-    pub fn new(receiver: Receiver<Lyle>, processors: Vec<ActionExecutor>) -> Self {
+    pub fn new(receiver: Receiver<TransitionChange>, processors: Vec<ActionExecutor>) -> Self {
         Runtime {
             receiver,
             actions: processors,
@@ -130,12 +151,11 @@ impl Runtime {
     pub fn run_blocking(&mut self) -> Result<()> {
         loop {
             let msg = self.receiver.recv()?;
-
-            match msg.event {
+            match msg.to_event {
                 Event::Terminate => break,
                 Event::Mode(mode) => {
                     for p in self.actions.iter_mut() {
-                        p.execute(mode, msg.slate_context.clone());
+                        p.execute(mode, msg.to_slate_context.clone());
                     }
                 }
             }
@@ -219,7 +239,7 @@ fn try_call(call: &HttpCall) -> Result<()> {
 mod tests {
     use super::*;
     use crossbeam::channel::unbounded;
-    use hawkeye_core::models::{FakeAction, HttpMethod};
+    use hawkeye_core::models::{FakeAction, HttpMethod, ToContext};
     use mockito::{mock, server_url, Matcher};
     use sn_fake_clock::FakeClock;
     use std::collections::HashMap;
@@ -238,7 +258,7 @@ mod tests {
             execute_returns: Some(Ok(())),
         };
         let mut executor = ActionExecutor::new(
-            TransitionStateChange(VideoMode::Content, VideoMode::Slate),
+            TransitionChange(VideoMode::Content, VideoMode::Slate),
             Action::FakeAction(fake_action),
         );
         executor.execute(VideoMode::Content);
@@ -389,7 +409,13 @@ mod tests {
     fn build_executor_from_models() {
         let transition = models::Transition {
             from: models::VideoMode::Content,
+            from_context: None,
             to: models::VideoMode::Slate,
+            to_context: Some(ToContext {
+                slate_context: Some(SlateContext {
+                    slate_url: "http://foo.bar/baz.png".to_string(),
+                }),
+            }),
             actions: vec![models::Action::HttpCall(HttpCall {
                 description: Some("Trigger AdBreak using API".to_string()),
                 method: HttpMethod::POST,

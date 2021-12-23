@@ -1,13 +1,13 @@
-use std::fmt::Display;
 use crate::{auth, handlers};
 use eyre::ErrReport;
 use hawkeye_core::models::Watcher;
 use kube::Client;
-use serde::{Serialize, Serializer};
 use serde::ser::SerializeStruct;
+use serde::{Serialize, Serializer};
+use std::fmt::Display;
 use warp::hyper::StatusCode;
-use warp::{Filter, reject};
 use warp::reply::Response;
+use warp::{reject, Filter};
 
 /// API root for v1
 pub fn v1(
@@ -47,8 +47,8 @@ pub fn watcher_create(
         .and(with_client(client))
         .and_then(handlers::create_watcher)
 
-        // .or_else(|e| Err(warp::reject::custom(e.into())))
-        // .or_else(|e| Err(warp::reject::custom::<FieldError>(e.into())))
+    // .or_else(|e| Err(warp::reject::custom(e.into())))
+    // .or_else(|e| Err(warp::reject::custom::<FieldError>(e.into())))
 }
 
 /// GET /v1/watchers/{id}
@@ -144,11 +144,6 @@ pub struct ErrorResponse {
     pub message: String,
 }
 
-// #[derive(Debug, Clone, PartialEq)]
-// pub struct FieldError {
-//     message: String,
-// }
-
 impl reject::Reject for ErrorResponse {}
 
 impl Display for ErrorResponse {
@@ -199,7 +194,7 @@ async fn handle_rejection(
     err: warp::Rejection,
 ) -> Result<impl warp::Reply, std::convert::Infallible> {
     log::debug!("Rejection = {:?}", err);
-    let mut message= "".to_string();
+    let mut message = "".to_string();
     let code;
 
     if err.is_not_found() {
@@ -232,6 +227,8 @@ async fn handle_rejection(
             None => "an unknown server error has occurred".to_string(),
         }
     });
-    let json = warp::reply::json(&ErrorResponse { message: message.to_string() });
+    let json = warp::reply::json(&ErrorResponse {
+        message: message.to_string(),
+    });
     Ok(warp::reply::with_status(json, code))
 }

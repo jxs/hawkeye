@@ -1,4 +1,5 @@
 use crate::config::{CALL_WATCHER_TIMEOUT, NAMESPACE};
+use crate::filters::ErrorResponse;
 use crate::templates;
 use crate::templates::container_spec;
 use hawkeye_core::models::{Status, Watcher};
@@ -15,7 +16,6 @@ use warp::http::header::{CACHE_CONTROL, CONTENT_TYPE};
 use warp::http::{HeaderValue, StatusCode};
 use warp::hyper::Body;
 use warp::reply;
-use crate::filters::ErrorResponse;
 
 pub async fn list_watchers(client: Client) -> Result<impl warp::Reply, Infallible> {
     let lp = ListParams::default()
@@ -67,7 +67,7 @@ pub async fn create_watcher(
         return Ok(reply::with_status(
             reply::json(&fe),
             StatusCode::UNPROCESSABLE_ENTITY,
-        ))
+        ));
         // TODO: we can return Ok(fe) here if we remove the reply::json below. With both enabled,
         // the compile will error since the return type of Ok(fe) and the reply::with_status below
         // are two different types.
@@ -412,9 +412,9 @@ pub async fn start_watcher(id: String, client: Client) -> Result<impl warp::Repl
             });
             deployments_client
                 .patch_scale(
-              deployment.metadata.name.as_ref().unwrap(),
-                &patch_params,
-              &Patch::Merge(&deployment_scale_json)
+                    deployment.metadata.name.as_ref().unwrap(),
+                    &patch_params,
+                    &Patch::Merge(&deployment_scale_json),
                 )
                 .await
                 .unwrap();
@@ -452,7 +452,6 @@ pub async fn start_watcher(id: String, client: Client) -> Result<impl warp::Repl
         )),
     }
 }
-
 
 /// Stop a Watcher worker by making sure there's a replica count of 0 for the Kubernetes
 /// deployment.

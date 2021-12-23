@@ -1127,6 +1127,7 @@ dependencies = [
  "log",
  "pretty_assertions",
  "serde",
+ "serde_json",
  "serde_with",
  "url",
 ]
