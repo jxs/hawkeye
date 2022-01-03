@@ -2,7 +2,7 @@ use crate::metrics::{
     HTTP_CALL_DURATION, HTTP_CALL_ERROR_COUNTER, HTTP_CALL_RETRIED_COUNT,
     HTTP_CALL_RETRIES_EXHAUSTED_COUNT, HTTP_CALL_SUCCESS_COUNTER,
 };
-use crate::video_stream::{Event};
+use crate::video_stream::{Event, TransitionChange};
 use color_eyre::Result;
 use crossbeam::channel::Receiver;
 use hawkeye_core::models::{self, Action, HttpAuth, HttpCall, SlateContext, VideoMode};
@@ -30,7 +30,7 @@ impl ActionExecution for Action {
 
 /// Represents a sequence of video modes.
 #[derive(Clone, Eq, PartialEq)]
-pub struct TransitionChange(
+pub struct TransitionStateChange(
     VideoMode,
     Option<SlateContext>,
     VideoMode,
@@ -41,7 +41,7 @@ pub struct TransitionChange(
 ///
 /// The `ActionExecutor` abstracts the logic of execution that is inherent to all `Action` types.
 pub struct ActionExecutor {
-    transition_change: TransitionChange,
+    transition_change: TransitionStateChange,
     action: Action,
     last_mode: Option<VideoMode>,
     last_context: Option<SlateContext>,
@@ -50,7 +50,7 @@ pub struct ActionExecutor {
 
 impl ActionExecutor {
     /// Creates a new `ActionExecutor` instance
-    pub fn new(transition_change: TransitionChange, action: Action) -> Self {
+    pub fn new(transition_change: TransitionStateChange, action: Action) -> Self {
         Self {
             transition_change,
             action,
@@ -83,7 +83,7 @@ impl ActionExecutor {
         slate_context: &Option<SlateContext>,
     ) -> Option<Result<()>> {
         self.last_mode.and_then(|last_mode| {
-            if TransitionChange(
+            if TransitionStateChange(
                 last_mode,
                 self.last_context.clone(),
                 mode,
@@ -119,7 +119,7 @@ impl From<models::Transition> for Executors {
     fn from(transition: models::Transition) -> Self {
         let from_slate_context = transition.from_context.and_then(|fc| fc.slate_context);
         let to_slate_context = transition.to_context.and_then(|tc| tc.slate_context);
-        let target_transition = TransitionChange(
+        let target_transition = TransitionStateChange(
             transition.from,
             from_slate_context,
             transition.to,
@@ -151,11 +151,11 @@ impl Runtime {
     pub fn run_blocking(&mut self) -> Result<()> {
         loop {
             let msg = self.receiver.recv()?;
-            match msg.to_event {
+            match msg.event {
                 Event::Terminate => break,
                 Event::Mode(mode) => {
                     for p in self.actions.iter_mut() {
-                        p.execute(mode, msg.to_slate_context.clone());
+                        p.execute(mode, msg.slate_context.clone());
                     }
                 }
             }
@@ -241,6 +241,8 @@ mod tests {
     use crossbeam::channel::unbounded;
     use hawkeye_core::models::{FakeAction, HttpMethod, ToContext};
     use mockito::{mock, server_url, Matcher};
+    use rand::distributions::Alphanumeric;
+    use rand::{thread_rng, Rng};
     use sn_fake_clock::FakeClock;
     use std::collections::HashMap;
     use std::sync::atomic::{AtomicBool, Ordering};
@@ -250,6 +252,17 @@ mod tests {
         FakeClock::advance_time(d.as_millis() as u64);
     }
 
+    fn get_slate_context() -> SlateContext {
+        let file_name: String = thread_rng()
+            .sample_iter(&Alphanumeric)
+            .take(10)
+            .map(char::from)
+            .collect();
+        SlateContext {
+            slate_url: format!("http://foo.bar/{}.png", file_name).to_string(),
+        }
+    }
+
     #[test]
     fn executor_slate_action_called_when_transition_content_to_slate() {
         let called = Arc::new(AtomicBool::new(false));
@@ -257,15 +270,21 @@ mod tests {
             called: called.clone(),
             execute_returns: Some(Ok(())),
         };
+        let slate_context = get_slate_context();
         let mut executor = ActionExecutor::new(
-            TransitionChange(VideoMode::Content, VideoMode::Slate),
+            TransitionStateChange(
+                VideoMode::Content,
+                None,
+                VideoMode::Slate,
+                Option::from(slate_context),
+            ),
             Action::FakeAction(fake_action),
         );
-        executor.execute(VideoMode::Content);
+
         // Didn't call since it was the first state found
         assert_eq!(called.load(Ordering::SeqCst), false);
 
-        executor.execute(VideoMode::Slate);
+        executor.execute(VideoMode::Slate, Option::slate_context.clone());
         // Must be called since we had a state transition that matches what we defined in the executor
         assert_eq!(called.load(Ordering::SeqCst), true);
     }
@@ -277,18 +296,24 @@ mod tests {
             called: called.clone(),
             execute_returns: Some(Ok(())),
         };
+        let slate_context = get_slate_context();
         let mut executor = ActionExecutor::new(
-            TransitionStateChange(VideoMode::Content, VideoMode::Slate),
+            TransitionStateChange(
+                VideoMode::Content,
+                None,
+                VideoMode::Slate,
+                Option::from(slate_context),
+            ),
             Action::FakeAction(fake_action),
         );
-        executor.execute(VideoMode::Content);
-        executor.execute(VideoMode::Slate);
+        executor.execute(VideoMode::Content, None);
+        executor.execute(VideoMode::Slate, Option::from(slate_context));
         // Must be called since we had a state transition that matches what we defined in the executor
         assert_eq!(called.load(Ordering::SeqCst), true);
         // Reset state of our mock to "not called"
         called.store(false, Ordering::SeqCst);
-        executor.execute(VideoMode::Content);
-        executor.execute(VideoMode::Slate);
+        executor.execute(VideoMode::Content, None);
+        executor.execute(VideoMode::Slate, Option::from(slate_context));
         assert_eq!(called.load(Ordering::SeqCst), false);
     }
 
@@ -299,12 +324,18 @@ mod tests {
             called: called.clone(),
             execute_returns: Some(Ok(())),
         };
+        let slate_context = get_slate_context();
         let mut executor = ActionExecutor::new(
-            TransitionStateChange(VideoMode::Content, VideoMode::Slate),
+            TransitionStateChange(
+                VideoMode::Content,
+                None,
+                VideoMode::Slate,
+                Option::from(slate_context),
+            ),
             Action::FakeAction(fake_action),
         );
-        executor.execute(VideoMode::Content);
-        executor.execute(VideoMode::Slate);
+        executor.execute(VideoMode::Content, None);
+        executor.execute(VideoMode::Slate, Option::from(slate_context.clone()));
         // Must be called since we had a state transition that matches what we defined in the executor
         assert_eq!(called.load(Ordering::SeqCst), true);
         // Reset state of our mock to "not called"
@@ -313,8 +344,8 @@ mod tests {
         // Move time forward over the delay
         sleep(Duration::from_secs(11));
 
-        executor.execute(VideoMode::Content);
-        executor.execute(VideoMode::Slate);
+        executor.execute(VideoMode::Content, None);
+        executor.execute(VideoMode::Slate, Option::from(slate_context.clone()));
         assert_eq!(called.load(Ordering::SeqCst), true);
     }
 
@@ -325,12 +356,18 @@ mod tests {
             called: called.clone(),
             execute_returns: Some(Ok(())),
         };
+        let slate_context = get_slate_context();
         let mut executor = ActionExecutor::new(
-            TransitionStateChange(VideoMode::Content, VideoMode::Slate),
+            TransitionStateChange(
+                VideoMode::Content,
+                None,
+                VideoMode::Slate,
+                Option::from(slate_context),
+            ),
             Action::FakeAction(fake_action),
         );
-        executor.execute(VideoMode::Content);
-        executor.execute(VideoMode::Slate);
+        executor.execute(VideoMode::Content, None);
+        executor.execute(VideoMode::Slate, Option::from(slate_context.clone()));
         // Must be called since we had a state transition that matches what we defined in the executor
         assert_eq!(called.load(Ordering::SeqCst), true);
         // Reset state of our mock to "not called"
@@ -339,7 +376,7 @@ mod tests {
         // Move time forward over the delay
         sleep(Duration::from_secs(20));
 
-        executor.execute(VideoMode::Slate);
+        executor.execute(VideoMode::Slate, Option::from(slate_context.clone()));
         assert_eq!(called.load(Ordering::SeqCst), false);
     }
 
@@ -350,18 +387,32 @@ mod tests {
             called: called.clone(),
             execute_returns: Some(Ok(())),
         };
+        let slate_context = get_slate_context();
         let mut executor = ActionExecutor::new(
-            TransitionStateChange(VideoMode::Content, VideoMode::Slate),
+            TransitionStateChange(
+                VideoMode::Content,
+                None,
+                VideoMode::Slate,
+                Option::from(slate_context),
+            ),
             Action::FakeAction(fake_action),
         );
         // Prepare executor to be ready in the next call with `VideoMode::Slate`
-        executor.execute(VideoMode::Content);
+        executor.execute(VideoMode::Content, None);
         assert_eq!(called.load(Ordering::SeqCst), false);
 
         let (s, r) = unbounded();
         // Pile up some events for the runtime to consume
-        s.send(Event::Mode(VideoMode::Slate)).unwrap();
-        s.send(Event::Terminate).unwrap();
+        s.send(TransitionChange {
+            event: Event::Mode(VideoMode::Slate),
+            slate_context: Option::from(slate_context.clone()),
+        })
+        .unwrap();
+        s.send(TransitionChange {
+            event: Event::Terminate,
+            slate_context: None,
+        })
+        .unwrap();
 
         let mut runtime = Runtime::new(r, vec![executor]);
         runtime.run_blocking().expect("Should run successfully!");

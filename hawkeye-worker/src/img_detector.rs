@@ -2,6 +2,7 @@ use color_eyre::Result;
 use dssim::{DssimImage, ToRGBAPLU, RGBAPLU};
 use hawkeye_core::models::Transition;
 use imgref::{Img, ImgVec};
+use itertools::Itertools;
 use load_image::{Image, ImageData};
 
 pub struct Slate {
@@ -29,12 +30,12 @@ impl Slate {
         })
     }
 
-    pub fn is_match(&self, frame: &DssimImage<f32>) -> bool {
+    pub fn is_match(&self, frame: &DssimImage<f32>) -> (bool, u32) {
         let (res, _) = self.similarity_algorithm.compare(&self.slate, frame);
         let val: f64 = res.into();
         let val = (val * 1000f64) as u32;
 
-        val <= 900u32
+        (val <= 900u32, val)
     }
 }
 
@@ -58,16 +59,87 @@ impl SlateDetector {
     }
 
     pub fn matched_slate(&self, image_buffer: &[u8]) -> Option<&Slate> {
-        // since we are doing the work to grab the image buffer frame, we should compare all slates here?
         let frame_img = load_data(image_buffer).unwrap();
         let frame = self.similarity_algorithm.create_image(&frame_img).unwrap();
+        let t = "";
 
-        self.slates
+        let s = self
+            .slates
             .iter()
-            .find_map(|slate| match slate.is_match(&frame) {
-                true => Some(slate),
-                false => None,
+            .filter_map(|slate| {
+                let (is_match, match_score) = slate.is_match(&frame);
+                // let t1 = slate.transition.as_ref()
+                //     .and_then(|t| t.from_context.as_ref())
+                //     .and_then(|fc| fc.slate_context.as_ref())
+                //     .map(|sc| sc.slate_url.as_str())
+                //     .unwrap_or(t);
+                // let t2 = slate.transition.as_ref()
+                //     .and_then(|t| t.to_context.as_ref())
+                //     .and_then(|tc| tc.slate_context.as_ref())
+                //     .map(|sc| sc.slate_url.as_str())
+                //     .unwrap_or(t);
+
+                // log::info!("SLATE MATCHED: score={} from={} to={}", match_score.1, t1, t2);
+                match is_match {
+                    true => Some((slate, match_score)),
+                    false => None,
+                }
             })
+            .sorted_by_key(|slate_and_score| slate_and_score.1)
+            .map(|(slate, score)| {
+                let from_slate_url = slate
+                    .transition
+                    .as_ref()
+                    .and_then(|t| t.from_context.as_ref())
+                    .and_then(|fc| fc.slate_context.as_ref())
+                    .map(|sc| sc.slate_url.as_str())
+                    .unwrap_or(t);
+                let to_slate_url = slate
+                    .transition
+                    .as_ref()
+                    .and_then(|t| t.to_context.as_ref())
+                    .and_then(|tc| tc.slate_context.as_ref())
+                    .map(|sc| sc.slate_url.as_str())
+                    .unwrap_or(t);
+                if from_slate_url.to_string().len() > 0 || to_slate_url.to_string().len() > 0 {
+                    log::info!(
+                        "MATCHED Slate Scores: {} from={} to={}",
+                        score,
+                        from_slate_url,
+                        to_slate_url
+                    );
+                }
+
+                (slate, score)
+            })
+            .next()
+            .and_then(|s| Option::from(s.0));
+
+        match s {
+            Some(slate) => {
+                let from_slate_url = slate
+                    .transition
+                    .as_ref()
+                    .and_then(|t| t.from_context.as_ref())
+                    .and_then(|fc| fc.slate_context.as_ref())
+                    .map(|sc| sc.slate_url.as_str())
+                    .unwrap_or(t);
+                let to_slate_url = slate
+                    .transition
+                    .as_ref()
+                    .and_then(|t| t.to_context.as_ref())
+                    .and_then(|tc| tc.slate_context.as_ref())
+                    .map(|sc| sc.slate_url.as_str())
+                    .unwrap_or(t);
+
+                if from_slate_url.to_string().len() > 0 || to_slate_url.to_string().len() > 0 {
+                    log::info!("SLATE MATCHED: from={} to={}", from_slate_url, to_slate_url);
+                }
+            }
+            None => (), //log::debug!("No matches...")
+        }
+
+        s
     }
 }
 
@@ -112,10 +184,12 @@ mod test {
         slate
             .read_to_end(&mut buffer)
             .expect("Failed to write to buffer");
-        let detector = SlateDetector::new(buffer.as_slice()).unwrap();
+        let slate = Slate::new(buffer.as_slice(), None).unwrap();
+        let detector = SlateDetector::new(vec![slate]).unwrap();
         let slate_img = read_bytes("../resources/slate_120px.jpg");
+        let matched_slate = detector.matched_slate(slate_img.as_slice());
 
-        assert!(detector.is_match(slate_img.as_slice()));
+        assert!(matched_slate.is_some())
     }
 
     #[test]
@@ -126,9 +200,12 @@ mod test {
         slate
             .read_to_end(&mut buffer)
             .expect("Failed to write to buffer");
-        let detector = SlateDetector::new(buffer.as_slice()).unwrap();
+        let slate = Slate::new(buffer.as_slice(), None).unwrap();
+        let detector = SlateDetector::new(vec![slate]).unwrap();
         let frame_img = read_bytes("../resources/non-slate_120px.jpg");
 
-        assert_eq!(detector.is_match(frame_img.as_slice()), false);
+        let matched_slate = detector.matched_slate(frame_img.as_slice());
+
+        assert!(matched_slate.is_none())
     }
 }

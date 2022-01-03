@@ -136,8 +136,8 @@ pub fn process_frames(
 
     info!("Stopping pipeline gracefully!");
     // action_sink.send(Event::Terminate)?;
-    let blah = TransitionChange::new(Event::Terminate, None);
-    action_sink.send(blah)?;
+    let tc = TransitionChange::new(Event::Terminate, None);
+    action_sink.send(tc)?;
 
     Ok(())
 }
@@ -375,6 +375,9 @@ pub struct TransitionChange {
 
 impl TransitionChange {
     pub fn new(event: Event, slate_context: Option<SlateContext>) -> Self {
-        Self {event, slate_context}
+        Self {
+            event,
+            slate_context,
+        }
     }
 }
