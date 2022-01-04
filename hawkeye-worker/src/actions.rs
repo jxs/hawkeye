@@ -284,7 +284,7 @@ mod tests {
         // Didn't call since it was the first state found
         assert_eq!(called.load(Ordering::SeqCst), false);
 
-        executor.execute(VideoMode::Slate, Option::slate_context.clone());
+        executor.execute(VideoMode::Slate, Option::from(slate_context.clone()));
         // Must be called since we had a state transition that matches what we defined in the executor
         assert_eq!(called.load(Ordering::SeqCst), true);
     }

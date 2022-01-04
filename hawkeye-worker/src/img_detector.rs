@@ -61,85 +61,18 @@ impl SlateDetector {
     pub fn matched_slate(&self, image_buffer: &[u8]) -> Option<&Slate> {
         let frame_img = load_data(image_buffer).unwrap();
         let frame = self.similarity_algorithm.create_image(&frame_img).unwrap();
-        let t = "";
-
-        let s = self
-            .slates
+        self.slates
             .iter()
             .filter_map(|slate| {
                 let (is_match, match_score) = slate.is_match(&frame);
-                // let t1 = slate.transition.as_ref()
-                //     .and_then(|t| t.from_context.as_ref())
-                //     .and_then(|fc| fc.slate_context.as_ref())
-                //     .map(|sc| sc.slate_url.as_str())
-                //     .unwrap_or(t);
-                // let t2 = slate.transition.as_ref()
-                //     .and_then(|t| t.to_context.as_ref())
-                //     .and_then(|tc| tc.slate_context.as_ref())
-                //     .map(|sc| sc.slate_url.as_str())
-                //     .unwrap_or(t);
-
-                // log::info!("SLATE MATCHED: score={} from={} to={}", match_score.1, t1, t2);
                 match is_match {
                     true => Some((slate, match_score)),
                     false => None,
                 }
             })
             .sorted_by_key(|slate_and_score| slate_and_score.1)
-            .map(|(slate, score)| {
-                let from_slate_url = slate
-                    .transition
-                    .as_ref()
-                    .and_then(|t| t.from_context.as_ref())
-                    .and_then(|fc| fc.slate_context.as_ref())
-                    .map(|sc| sc.slate_url.as_str())
-                    .unwrap_or(t);
-                let to_slate_url = slate
-                    .transition
-                    .as_ref()
-                    .and_then(|t| t.to_context.as_ref())
-                    .and_then(|tc| tc.slate_context.as_ref())
-                    .map(|sc| sc.slate_url.as_str())
-                    .unwrap_or(t);
-                if from_slate_url.to_string().len() > 0 || to_slate_url.to_string().len() > 0 {
-                    log::info!(
-                        "MATCHED Slate Scores: {} from={} to={}",
-                        score,
-                        from_slate_url,
-                        to_slate_url
-                    );
-                }
-
-                (slate, score)
-            })
             .next()
-            .and_then(|s| Option::from(s.0));
-
-        match s {
-            Some(slate) => {
-                let from_slate_url = slate
-                    .transition
-                    .as_ref()
-                    .and_then(|t| t.from_context.as_ref())
-                    .and_then(|fc| fc.slate_context.as_ref())
-                    .map(|sc| sc.slate_url.as_str())
-                    .unwrap_or(t);
-                let to_slate_url = slate
-                    .transition
-                    .as_ref()
-                    .and_then(|t| t.to_context.as_ref())
-                    .and_then(|tc| tc.slate_context.as_ref())
-                    .map(|sc| sc.slate_url.as_str())
-                    .unwrap_or(t);
-
-                if from_slate_url.to_string().len() > 0 || to_slate_url.to_string().len() > 0 {
-                    log::info!("SLATE MATCHED: from={} to={}", from_slate_url, to_slate_url);
-                }
-            }
-            None => (), //log::debug!("No matches...")
-        }
-
-        s
+            .and_then(|s| Option::from(s.0))
     }
 }
 
