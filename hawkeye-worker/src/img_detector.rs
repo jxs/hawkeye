@@ -111,15 +111,15 @@ mod test {
 
     #[test]
     fn compare_equal_images() {
-        let mut slate =
-            File::open("../resources/slate_120px.jpg").expect("Missing file in resources folder");
+        let mut slate = File::open("../resources/slate_fixtures/slate-0-cbsaa-213x120.jpg")
+            .expect("Missing file in resources folder");
         let mut buffer = Vec::new();
         slate
             .read_to_end(&mut buffer)
             .expect("Failed to write to buffer");
         let slate = Slate::new(buffer.as_slice(), None).unwrap();
         let detector = SlateDetector::new(vec![slate]).unwrap();
-        let slate_img = read_bytes("../resources/slate_120px.jpg");
+        let slate_img = read_bytes("../resources/slate_fixtures/slate-0-cbsaa-213x120.jpg");
         let matched_slate = detector.matched_slate(slate_img.as_slice());
 
         assert!(matched_slate.is_some())
@@ -127,15 +127,15 @@ mod test {
 
     #[test]
     fn compare_diff_images() {
-        let mut slate =
-            File::open("../resources/slate_120px.jpg").expect("Missing file in resources folder");
+        let mut slate = File::open("../resources/slate_fixtures/slate-0-cbsaa-213x120.jpg")
+            .expect("Missing file in resources folder");
         let mut buffer = Vec::new();
         slate
             .read_to_end(&mut buffer)
             .expect("Failed to write to buffer");
         let slate = Slate::new(buffer.as_slice(), None).unwrap();
         let detector = SlateDetector::new(vec![slate]).unwrap();
-        let frame_img = read_bytes("../resources/non-slate_120px.jpg");
+        let frame_img = read_bytes("../resources/slate_fixtures/non-slate-213x120.jpg");
 
         let matched_slate = detector.matched_slate(frame_img.as_slice());
 

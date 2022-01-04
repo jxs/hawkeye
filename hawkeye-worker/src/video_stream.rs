@@ -47,7 +47,7 @@ pub fn process_frames(
 ) -> Result<()> {
     log::debug!("process_frames called...");
 
-    let black_image = include_bytes!("../../resources/black_120px.jpg");
+    let black_image = include_bytes!("../../resources/slate_fixtures/black-213x120.jpg");
     let black_slate = Slate::new(black_image, None);
     let black_detector = SlateDetector::new(vec![black_slate.unwrap()])?;
 

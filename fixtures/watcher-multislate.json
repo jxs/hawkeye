@@ -16,7 +16,7 @@
       "to": "slate",
       "to_context": {
         "slate_context": {
-          "slate_url": "file://./resources/slate_120px.jpg"
+          "slate_url": "file://./resources/slate_fixtures/slate-0-cbsaa-213x120.jpg"
         }
       },
       "actions": [
@@ -26,7 +26,7 @@
           "method": "POST",
           "retries": 3,
           "timeout": 10,
-          "url": "http://localhost:4200/t0/from:content/to:slate/slate_120px.jpg",
+          "url": "http://localhost:4200/t0/from:content/to:slateslate-0-cbsaa-213x120.jpg",
           "authorization": {
             "basic": {
               "username": "dev_user",

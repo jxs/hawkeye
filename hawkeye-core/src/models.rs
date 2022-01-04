@@ -308,7 +308,7 @@ mod tests {
             status_description: None,
             source: Source {
                 ingest_ip: None,
-                ingest_port: 5001,
+                ingest_port: 5000,
                 container: Container::MpegTs,
                 codec: Codec::H264,
                 transport: Protocol::Rtp
@@ -320,7 +320,7 @@ mod tests {
                     to: VideoMode::Slate,
                     to_context: Option::from(ToContext {
                         slate_context: Option::from(SlateContext {
-                            slate_url: "file://./resources/slate_120px.jpg".to_string()
+                            slate_url: "file://./resources/slate_fixtures/slate-0-cbsaa-213x120.jpg".to_string()
                         })
                     }),
                     actions: vec![
@@ -343,7 +343,7 @@ mod tests {
                 from: VideoMode::Slate,
                 from_context: Option::from(FromContext {
                     slate_context: Option::from(SlateContext {
-                        slate_url: "file://./resources/slate_120px.jpg".to_string()
+                        slate_url: "file://./resources/slate_fixtures/slate-0-cbsaa-213x120.jpg".to_string()
                     })
                 }),
                 to: VideoMode::Content,
