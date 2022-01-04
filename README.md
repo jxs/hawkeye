@@ -22,10 +22,11 @@ The full Hawkeye application consists of:
 
 There are multiple ways to run these components locally.
 
-### Docker
+### Local Docker Setup
 
 > `hawkeye-api` currently has a hard dependency on being executed within a Kubernetes
-> environment, so it's helpful to run Docker with Kubernetes enabled.
+> environment, so it's helpful to run Docker with Kubernetes enabled if you use
+> something like Docker Desktop.
 
 To run a Worker service:
 
@@ -36,48 +37,66 @@ docker run -it \
   -p 5000:5000/udp \
   -p 3030:3030 \
   -v $(pwd)/fixtures:/local \
-  hawkeye-worker /local/watcher.json
+  hawkeye-worker /local/watcher-basic.json
 ```
 
 Where:
 - `5000:5000` exposes the API on port `5000`
 - `3030:3030`
 
-### OS X
+### Local OS X Setup
 
-Install `gstreamer` and dependencies.
+Install `gstreamer` and dependencies so Cargo dependencies are able to be compiled.
 
 ```shell
 brew install gstreamer gst-libav gst-plugins-base \
              gst-plugins-good gst-plugins-bad gst-plugins-ugly
 ```
 
-Then, use `ffmpeg` to stream a prepared media file that could contain black slates,
-regular 'ol video frames, and some slates of our choosing.
+### Local Linux (Debian) Setup
+
+```shell
+apt-get install -y --no-install-recommends \
+  pkg-config libssl-dev libglib2.0-dev \
+  libgstreamer1.0-dev gstreamer1.0-libav libgstreamer-plugins-base1.0-dev \
+  gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly
+```
+
+### Streaming Video
+
+You can easily stream prepared media via `ffmpeg` to a Watcher to test functionality.
+
+For example, you might have a set of slates configured on a Watcher and a custom video
+clip that alternates playing a video with the slates spliced in. If you wanted to test
+end-to-end, you'd want to stream this video to a Watcher and verify the configured
+actions take place for each transition.
 
 ```shell
 brew install ffmpeg
 ```
 
-```shell
+Save the following script to file to easily stream video files or run the `ffmpeg`
+command yourself. Don't forget to `chmod +x <your-script-name.sh>` to make life easy.
+
+```bash
 #!/usr/bin/env bash
 
 file=$1
-if [ -z $file ]; then
+port=$2
+if [[ -z $file ]] || [[ -z $port ]]; then
     me=$(basename $0)
-    echo "USAGE: ${me} <path-to-video-file>"
+    echo "USAGE: ${me} <path-to-video-file> <port>"
     exit 1
 fi
 
 ffmpeg \
-    -stream_loop -1 \
     -re \
     -y \
-    -i "$1" \
+    -i "${file}" \
     -an \
     -c:v copy \
     -f rtp_mpegts \
-    udp://localhost:5000
+    udp://0.0.0.0:${port}
 ```
 
 ## Prometheus Metrics
@@ -86,10 +105,4 @@ The Worker exposes metrics in the standard `/metrics` path for Prometheus to har
 
 ```bash
 curl http://localhost:3030/metrics
-```
-
-The payload looks something like:
-
-```json
-
 ```
