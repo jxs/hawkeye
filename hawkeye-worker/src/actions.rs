@@ -44,7 +44,7 @@ pub struct ActionExecutor {
     transition_change: TransitionStateChange,
     action: Action,
     last_mode: Option<VideoMode>,
-    last_context: Option<SlateContext>,
+    last_slate_context: Option<SlateContext>,
     last_call: Option<Instant>,
 }
 
@@ -55,7 +55,7 @@ impl ActionExecutor {
             transition_change,
             action,
             last_mode: None,
-            last_context: None,
+            last_slate_context: None,
             last_call: None,
         }
     }
@@ -72,7 +72,7 @@ impl ActionExecutor {
             }
         }
         self.last_mode = Some(mode);
-        self.last_context = slate_context.clone();
+        self.last_slate_context = slate_context.clone();
     }
 
     /// Executes the action if the video mode matches the transition and if the action is
@@ -85,7 +85,7 @@ impl ActionExecutor {
         self.last_mode.and_then(|last_mode| {
             if TransitionStateChange(
                 last_mode,
-                self.last_context.clone(),
+                self.last_slate_context.clone(),
                 mode,
                 slate_context.clone(),
             ) == self.transition_change
@@ -241,8 +241,6 @@ mod tests {
     use crossbeam::channel::unbounded;
     use hawkeye_core::models::{FakeAction, HttpMethod, ToContext};
     use mockito::{mock, server_url, Matcher};
-    use rand::distributions::Alphanumeric;
-    use rand::{thread_rng, Rng};
     use sn_fake_clock::FakeClock;
     use std::collections::HashMap;
     use std::sync::atomic::{AtomicBool, Ordering};
@@ -252,14 +250,9 @@ mod tests {
         FakeClock::advance_time(d.as_millis() as u64);
     }
 
-    fn get_slate_context() -> SlateContext {
-        let file_name: String = thread_rng()
-            .sample_iter(&Alphanumeric)
-            .take(10)
-            .map(char::from)
-            .collect();
+    fn get_slate_context(filename: &str) -> SlateContext {
         SlateContext {
-            slate_url: format!("http://foo.bar/{}.png", file_name).to_string(),
+            slate_url: format!("http://foo.bar.local/{}.jpg", filename),
         }
     }
 
@@ -270,21 +263,21 @@ mod tests {
             called: called.clone(),
             execute_returns: Some(Ok(())),
         };
-        let slate_context = get_slate_context();
+        let slate_url_filename = "foobar";
         let mut executor = ActionExecutor::new(
             TransitionStateChange(
                 VideoMode::Content,
                 None,
                 VideoMode::Slate,
-                Option::from(slate_context),
+                Some(get_slate_context(slate_url_filename)),
             ),
             Action::FakeAction(fake_action),
         );
-
+        executor.execute(VideoMode::Content, None);
         // Didn't call since it was the first state found
         assert_eq!(called.load(Ordering::SeqCst), false);
 
-        executor.execute(VideoMode::Slate, Option::from(slate_context.clone()));
+        executor.execute(VideoMode::Slate, Some(get_slate_context(slate_url_filename)));
         // Must be called since we had a state transition that matches what we defined in the executor
         assert_eq!(called.load(Ordering::SeqCst), true);
     }
@@ -296,24 +289,24 @@ mod tests {
             called: called.clone(),
             execute_returns: Some(Ok(())),
         };
-        let slate_context = get_slate_context();
+        let slate_url_filename = "foobar";
         let mut executor = ActionExecutor::new(
             TransitionStateChange(
                 VideoMode::Content,
                 None,
                 VideoMode::Slate,
-                Option::from(slate_context),
+                Some(get_slate_context(slate_url_filename)),
             ),
             Action::FakeAction(fake_action),
         );
         executor.execute(VideoMode::Content, None);
-        executor.execute(VideoMode::Slate, Option::from(slate_context));
+        executor.execute(VideoMode::Slate, Some(get_slate_context(slate_url_filename)));
         // Must be called since we had a state transition that matches what we defined in the executor
         assert_eq!(called.load(Ordering::SeqCst), true);
         // Reset state of our mock to "not called"
         called.store(false, Ordering::SeqCst);
         executor.execute(VideoMode::Content, None);
-        executor.execute(VideoMode::Slate, Option::from(slate_context));
+        executor.execute(VideoMode::Slate, Some(get_slate_context(slate_url_filename)));
         assert_eq!(called.load(Ordering::SeqCst), false);
     }
 
@@ -324,18 +317,18 @@ mod tests {
             called: called.clone(),
             execute_returns: Some(Ok(())),
         };
-        let slate_context = get_slate_context();
+        let slate_url_filename = "foobar";
         let mut executor = ActionExecutor::new(
             TransitionStateChange(
                 VideoMode::Content,
                 None,
                 VideoMode::Slate,
-                Option::from(slate_context),
+                Some(get_slate_context(slate_url_filename)),
             ),
             Action::FakeAction(fake_action),
         );
         executor.execute(VideoMode::Content, None);
-        executor.execute(VideoMode::Slate, Option::from(slate_context.clone()));
+        executor.execute(VideoMode::Slate, Some(get_slate_context(slate_url_filename)));
         // Must be called since we had a state transition that matches what we defined in the executor
         assert_eq!(called.load(Ordering::SeqCst), true);
         // Reset state of our mock to "not called"
@@ -345,7 +338,7 @@ mod tests {
         sleep(Duration::from_secs(11));
 
         executor.execute(VideoMode::Content, None);
-        executor.execute(VideoMode::Slate, Option::from(slate_context.clone()));
+        executor.execute(VideoMode::Slate, Some(get_slate_context(slate_url_filename)));
         assert_eq!(called.load(Ordering::SeqCst), true);
     }
 
@@ -356,18 +349,18 @@ mod tests {
             called: called.clone(),
             execute_returns: Some(Ok(())),
         };
-        let slate_context = get_slate_context();
+        let slate_url_filename = "foobar";
         let mut executor = ActionExecutor::new(
             TransitionStateChange(
                 VideoMode::Content,
                 None,
                 VideoMode::Slate,
-                Option::from(slate_context),
+                Some(get_slate_context(slate_url_filename)),
             ),
             Action::FakeAction(fake_action),
         );
         executor.execute(VideoMode::Content, None);
-        executor.execute(VideoMode::Slate, Option::from(slate_context.clone()));
+        executor.execute(VideoMode::Slate, Some(get_slate_context(slate_url_filename)));
         // Must be called since we had a state transition that matches what we defined in the executor
         assert_eq!(called.load(Ordering::SeqCst), true);
         // Reset state of our mock to "not called"
@@ -376,7 +369,7 @@ mod tests {
         // Move time forward over the delay
         sleep(Duration::from_secs(20));
 
-        executor.execute(VideoMode::Slate, Option::from(slate_context.clone()));
+        executor.execute(VideoMode::Slate, Some(get_slate_context(slate_url_filename)));
         assert_eq!(called.load(Ordering::SeqCst), false);
     }
 
@@ -387,13 +380,13 @@ mod tests {
             called: called.clone(),
             execute_returns: Some(Ok(())),
         };
-        let slate_context = get_slate_context();
+        let slate_url_filename = "foobar";
         let mut executor = ActionExecutor::new(
             TransitionStateChange(
                 VideoMode::Content,
                 None,
                 VideoMode::Slate,
-                Option::from(slate_context),
+                Some(get_slate_context(slate_url_filename)),
             ),
             Action::FakeAction(fake_action),
         );
@@ -405,7 +398,7 @@ mod tests {
         // Pile up some events for the runtime to consume
         s.send(TransitionChange {
             event: Event::Mode(VideoMode::Slate),
-            slate_context: Option::from(slate_context.clone()),
+            slate_context: Some(get_slate_context(slate_url_filename)),
         })
         .unwrap();
         s.send(TransitionChange {
