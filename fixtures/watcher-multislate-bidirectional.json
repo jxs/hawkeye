@@ -1,0 +1,363 @@
+{
+  "id": "887a16c9-d445-43bf-b223-576ff6510144",
+  "description": "Multiple slates, each with both a content->slate and slate->content transition",
+  "status": "running",
+  "source": {
+    "ingest_port": 5002,
+    "container": "mpeg-ts",
+    "codec": "h264",
+    "transport": {
+      "protocol": "rtp"
+    }
+  },
+  "transitions": [
+    {
+      "from": "content",
+      "to": "slate",
+      "to_context": {
+        "slate_context": {
+          "slate_url": "file://./resources/slate_120px.jpg"
+        }
+      },
+      "actions": [
+        {
+          "description": "Trigger AdBreak using API",
+          "type": "http_call",
+          "method": "POST",
+          "retries": 3,
+          "timeout": 10,
+          "url": "http://localhost:4200/t0/from:content/to:slate/slate_120px.jpg",
+          "authorization": {
+            "basic": {
+              "username": "dev_user",
+              "password": "something"
+            }
+          },
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": "{\"duration\":300}"
+        }
+      ]
+    },
+    {
+      "from": "content",
+      "to": "slate",
+      "to_context": {
+        "slate_context": {
+          "slate_url": "file://./resources/slate_fixtures/slate-1-portland.jpg"
+        }
+      },
+      "actions": [
+        {
+          "description": "Trigger AdBreak using API",
+          "type": "http_call",
+          "method": "GET",
+          "retries": 3,
+          "timeout": 10,
+          "url": "http://localhost:4200/t1/from:content/to:slate/slate-1-portland.jpg",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": "{\"foo\":\"bar\"}"
+        }
+      ]
+    },
+    {
+      "from": "content",
+      "to": "slate",
+      "to_context": {
+        "slate_context": {
+          "slate_url": "file://./resources/slate_fixtures/slate-2-grandcanyon.jpg"
+        }
+      },
+      "actions": [
+        {
+          "description": "Trigger AdBreak using API",
+          "type": "http_call",
+          "method": "PATCH",
+          "retries": 3,
+          "timeout": 10,
+          "url": "http://localhost:4200/t2/from:content/to:slate/slate-2-grandcanyon.jpg",
+          "body": "{\"updated\":\"field\"}"
+        }
+      ]
+    },
+    {
+      "from": "content",
+      "to": "slate",
+      "to_context": {
+        "slate_context": {
+          "slate_url": "file://./resources/slate_fixtures/slate-3-rust.jpg"
+        }
+      },
+      "actions": [
+        {
+          "description": "Trigger AdBreak using API",
+          "type": "http_call",
+          "method": "DELETE",
+          "url": "http://localhost:4200/t3/from:content/to:slate/slate-3-rust.jpg"
+        }
+      ]
+    },
+    {
+      "from": "content",
+      "to": "slate",
+      "to_context": {
+        "slate_context": {
+          "slate_url": "file://./resources/slate_fixtures/slate-4-gogopher.jpg"
+        }
+      },
+      "actions": [
+        {
+          "description": "Trigger AdBreak using API",
+          "type": "http_call",
+          "method": "DELETE",
+          "url": "http://localhost:4200/t4/from:content/to:slate/slate-4-gogopher.jpg"
+        }
+      ]
+    },
+    {
+      "from": "content",
+      "to": "slate",
+      "to_context": {
+        "slate_context": {
+          "slate_url": "file://./resources/slate_fixtures/slate-5-gstreamer.jpg"
+        }
+      },
+      "actions": [
+        {
+          "description": "Trigger AdBreak using API",
+          "type": "http_call",
+          "method": "DELETE",
+          "url": "http://localhost:4200/t5/from:content/to:slate/slate-5-gstreamer.jpg"
+        }
+      ]
+    },
+    {
+      "from": "content",
+      "to": "slate",
+      "to_context": {
+        "slate_context": {
+          "slate_url": "file://./resources/slate_fixtures/slate-6-cbsviacom.jpg"
+        }
+      },
+      "actions": [
+        {
+          "description": "Trigger AdBreak using API",
+          "type": "http_call",
+          "method": "DELETE",
+          "url": "http://localhost:4200/t6/from:content/to:slate/slate-6-cbsviacom.jpg"
+        }
+      ]
+    },
+    {
+      "from": "content",
+      "to": "slate",
+      "to_context": {
+        "slate_context": {
+          "slate_url": "file://./resources/slate_fixtures/slate-7.png"
+        }
+      },
+      "actions": [
+        {
+          "description": "Trigger AdBreak using API",
+          "type": "http_call",
+          "method": "DELETE",
+          "url": "http://localhost:4200/t7/from:content/to:slate/slate-7.png"
+        }
+      ]
+    },
+    {
+      "from": "content",
+      "to": "slate",
+      "to_context": {
+        "slate_context": {
+          "slate_url": "file://./resources/slate_fixtures/slate-8.png"
+        }
+      },
+      "actions": [
+        {
+          "description": "Trigger AdBreak using API",
+          "type": "http_call",
+          "method": "DELETE",
+          "url": "http://localhost:4200/t8/from:content/to:slate/slate-8.png"
+        }
+      ]
+    },
+    {
+      "from": "slate",
+      "from_context": {
+        "slate_context": {
+          "slate_url": "file://./resources/slate_120px.jpg"
+        }
+      },
+      "to": "content",
+      "actions": [
+        {
+          "description": "Trigger AdBreak using API",
+          "type": "http_call",
+          "method": "POST",
+          "retries": 3,
+          "timeout": 10,
+          "url": "http://localhost:4200/t0/from:content/to:slate/slate_120px.jpg",
+          "authorization": {
+            "basic": {
+              "username": "dev_user",
+              "password": "something"
+            }
+          },
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": "{\"duration\":300}"
+        }
+      ]
+    },
+    {
+      "from": "slate",
+      "from_context": {
+        "slate_context": {
+          "slate_url": "file://./resources/slate_fixtures/slate-1-portland.jpg"
+        }
+      },
+      "to": "content",
+      "actions": [
+        {
+          "description": "Trigger AdBreak using API",
+          "type": "http_call",
+          "method": "GET",
+          "retries": 3,
+          "timeout": 10,
+          "url": "http://localhost:4200/t1/from:content/to:slate/slate-1-portland.jpg",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": "{\"foo\":\"bar\"}"
+        }
+      ]
+    },
+    {
+      "from": "slate",
+      "from_context": {
+        "slate_context": {
+          "slate_url": "file://./resources/slate_fixtures/slate-2-grandcanyon.jpg"
+        }
+      },
+      "to": "content",
+      "actions": [
+        {
+          "description": "Trigger AdBreak using API",
+          "type": "http_call",
+          "method": "PATCH",
+          "retries": 3,
+          "timeout": 10,
+          "url": "http://localhost:4200/t2/from:content/to:slate/slate-2-grandcanyon.jpg",
+          "body": "{\"updated\":\"field\"}"
+        }
+      ]
+    },
+    {
+      "from": "slate",
+      "from_context": {
+        "slate_context": {
+          "slate_url": "file://./resources/slate_fixtures/slate-3-rust.jpg"
+        }
+      },
+      "to": "content",
+      "actions": [
+        {
+          "description": "Trigger AdBreak using API",
+          "type": "http_call",
+          "method": "DELETE",
+          "url": "http://localhost:4200/t3/from:content/to:slate/slate-3-rust.jpg"
+        }
+      ]
+    },
+    {
+      "from": "slate",
+      "from_context": {
+        "slate_context": {
+          "slate_url": "file://./resources/slate_fixtures/slate-4-gogopher.jpg"
+        }
+      },
+      "to": "content",
+      "actions": [
+        {
+          "description": "Trigger AdBreak using API",
+          "type": "http_call",
+          "method": "DELETE",
+          "url": "http://localhost:4200/t4/from:content/to:slate/slate-4-gogopher.jpg"
+        }
+      ]
+    },
+    {
+      "from": "slate",
+      "from_context": {
+        "slate_context": {
+          "slate_url": "file://./resources/slate_fixtures/slate-5-gstreamer.jpg"
+        }
+      },
+      "to": "content",
+      "actions": [
+        {
+          "description": "Trigger AdBreak using API",
+          "type": "http_call",
+          "method": "DELETE",
+          "url": "http://localhost:4200/t5/from:content/to:slate/slate-5-gstreamer.jpg"
+        }
+      ]
+    },
+    {
+      "from": "slate",
+      "from_context": {
+        "slate_context": {
+          "slate_url": "file://./resources/slate_fixtures/slate-6-cbsviacom.jpg"
+        }
+      },
+      "to": "content",
+      "actions": [
+        {
+          "description": "Trigger AdBreak using API",
+          "type": "http_call",
+          "method": "DELETE",
+          "url": "http://localhost:4200/t6/from:content/to:slate/slate-6-cbsviacom.jpg"
+        }
+      ]
+    },
+    {
+      "from": "slate",
+      "from_context": {
+        "slate_context": {
+          "slate_url": "file://./resources/slate_fixtures/slate-7.png"
+        }
+      },
+      "to": "content",
+      "actions": [
+        {
+          "description": "Trigger AdBreak using API",
+          "type": "http_call",
+          "method": "DELETE",
+          "url": "http://localhost:4200/t7/from:content/to:slate/slate-7.png"
+        }
+      ]
+    },
+    {
+      "from": "slate",
+      "from_context": {
+        "slate_context": {
+          "slate_url": "file://./resources/slate_fixtures/slate-8.png"
+        }
+      },
+      "to": "content",
+      "actions": [
+        {
+          "description": "Trigger AdBreak using API",
+          "type": "http_call",
+          "method": "DELETE",
+          "url": "http://localhost:4200/t8/from:content/to:slate/slate-8.png"
+        }
+      ]
+    }
+  ]
+}

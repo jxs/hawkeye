@@ -3,7 +3,7 @@
   "description": "UEFA 2020 - Lyon vs. Bayern",
   "status": "running",
   "source": {
-    "ingest_port": 5001,
+    "ingest_port": 5000,
     "container": "mpeg-ts",
     "codec": "h264",
     "transport": {

@@ -1,9 +1,9 @@
 {
   "id": "4e251c33-8b34-4d42-9461-58aae0086ac4",
-  "description": "lyles test asset",
+  "description": "Multiple slates, but transitions only from content -> slate",
   "status": "running",
   "source": {
-    "ingest_port": 5003,
+    "ingest_port": 5001,
     "container": "mpeg-ts",
     "codec": "h264",
     "transport": {
@@ -11,7 +11,6 @@
     }
   },
   "transitions": [
-
     {
       "from": "content",
       "to": "slate",
@@ -152,7 +151,7 @@
         }
       ]
     },
-        {
+    {
       "from": "content",
       "to": "slate",
       "to_context": {
@@ -169,7 +168,7 @@
         }
       ]
     },
-        {
+    {
       "from": "content",
       "to": "slate",
       "to_context": {
