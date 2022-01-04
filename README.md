@@ -22,11 +22,22 @@ The full Hawkeye application consists of:
 
 There are multiple ways to run these components locally.
 
-### Local Docker Setup
+- Run a local API to accept `POST /v1/watchers` payloads. This request will also spawn
+  a Kubernetes deployment and a "Watcher service" that runs a worker that digests
+  a stream source to look for the configured slates (and fire the associated actions
+  for that slate...).
+- You may forgo the API abstraction and call a Watcher with a hardcoded config directly:
+  ```shell
+  cargo build --bin hawkeye-worker
+  ./target/debug/hawkeye-worker fixtures/watcher-basic.json
+  # Then, stream video to that port. See below for how to do this via `ffmpeg`.
+  ```
 
 > `hawkeye-api` currently has a hard dependency on being executed within a Kubernetes
 > environment, so it's helpful to run Docker with Kubernetes enabled if you use
 > something like Docker Desktop.
+
+### Local Docker Setup
 
 To run a Worker service:
 

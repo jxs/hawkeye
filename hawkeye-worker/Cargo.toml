@@ -13,7 +13,6 @@ glib = "0.14.8"
 gstreamer = "0.17.4"
 gstreamer-app = "0.17.2"
 derive_more = "0.99.17"
-#dssim = "3.1.0"
 dssim = "2.11.5"
 load_image = { version = "2.15", features = ["static"] }
 imgref = "1.7"
@@ -28,7 +27,7 @@ ctrlc = { version = "3.2", features = ["termination"] }
 prometheus = "0.13.0"
 lazy_static = "1.4.0"
 tokio = { version = "1.14", features = ["full"] }
-warp = "0.3"
+warp = { version = "0.3", default-features = false, features = ["tls"] }
 concread = "0.2.19"
 crossbeam = "0.8.1"
 rand = "0.8"
