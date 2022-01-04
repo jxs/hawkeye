@@ -277,7 +277,10 @@ mod tests {
         // Didn't call since it was the first state found
         assert_eq!(called.load(Ordering::SeqCst), false);
 
-        executor.execute(VideoMode::Slate, Some(get_slate_context(slate_url_filename)));
+        executor.execute(
+            VideoMode::Slate,
+            Some(get_slate_context(slate_url_filename)),
+        );
         // Must be called since we had a state transition that matches what we defined in the executor
         assert_eq!(called.load(Ordering::SeqCst), true);
     }
@@ -300,13 +303,19 @@ mod tests {
             Action::FakeAction(fake_action),
         );
         executor.execute(VideoMode::Content, None);
-        executor.execute(VideoMode::Slate, Some(get_slate_context(slate_url_filename)));
+        executor.execute(
+            VideoMode::Slate,
+            Some(get_slate_context(slate_url_filename)),
+        );
         // Must be called since we had a state transition that matches what we defined in the executor
         assert_eq!(called.load(Ordering::SeqCst), true);
         // Reset state of our mock to "not called"
         called.store(false, Ordering::SeqCst);
         executor.execute(VideoMode::Content, None);
-        executor.execute(VideoMode::Slate, Some(get_slate_context(slate_url_filename)));
+        executor.execute(
+            VideoMode::Slate,
+            Some(get_slate_context(slate_url_filename)),
+        );
         assert_eq!(called.load(Ordering::SeqCst), false);
     }
 
@@ -328,7 +337,10 @@ mod tests {
             Action::FakeAction(fake_action),
         );
         executor.execute(VideoMode::Content, None);
-        executor.execute(VideoMode::Slate, Some(get_slate_context(slate_url_filename)));
+        executor.execute(
+            VideoMode::Slate,
+            Some(get_slate_context(slate_url_filename)),
+        );
         // Must be called since we had a state transition that matches what we defined in the executor
         assert_eq!(called.load(Ordering::SeqCst), true);
         // Reset state of our mock to "not called"
@@ -338,7 +350,10 @@ mod tests {
         sleep(Duration::from_secs(11));
 
         executor.execute(VideoMode::Content, None);
-        executor.execute(VideoMode::Slate, Some(get_slate_context(slate_url_filename)));
+        executor.execute(
+            VideoMode::Slate,
+            Some(get_slate_context(slate_url_filename)),
+        );
         assert_eq!(called.load(Ordering::SeqCst), true);
     }
 
@@ -360,7 +375,10 @@ mod tests {
             Action::FakeAction(fake_action),
         );
         executor.execute(VideoMode::Content, None);
-        executor.execute(VideoMode::Slate, Some(get_slate_context(slate_url_filename)));
+        executor.execute(
+            VideoMode::Slate,
+            Some(get_slate_context(slate_url_filename)),
+        );
         // Must be called since we had a state transition that matches what we defined in the executor
         assert_eq!(called.load(Ordering::SeqCst), true);
         // Reset state of our mock to "not called"
@@ -369,7 +387,10 @@ mod tests {
         // Move time forward over the delay
         sleep(Duration::from_secs(20));
 
-        executor.execute(VideoMode::Slate, Some(get_slate_context(slate_url_filename)));
+        executor.execute(
+            VideoMode::Slate,
+            Some(get_slate_context(slate_url_filename)),
+        );
         assert_eq!(called.load(Ordering::SeqCst), false);
     }
 
