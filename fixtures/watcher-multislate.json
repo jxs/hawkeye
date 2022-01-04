@@ -1,9 +1,9 @@
 {
-  "id": "4e251c33-8b34-4d42-9461-58aae0086ac4",
-  "description": "Multiple slates, but transitions only from content -> slate",
+  "id": "887a16c9-d445-43bf-b223-576ff6510144",
+  "description": "Multiple slates, each with both a content->slate and slate->content transition",
   "status": "running",
   "source": {
-    "ingest_port": 5001,
+    "ingest_port": 5002,
     "container": "mpeg-ts",
     "codec": "h264",
     "transport": {
@@ -45,7 +45,7 @@
       "to": "slate",
       "to_context": {
         "slate_context": {
-          "slate_url": "file://./resources/slate_fixtures/slate-1-portland.jpg"
+          "slate_url": "file://./resources/slate_fixtures/slate-1-portland-213x120.jpg"
         }
       },
       "actions": [
@@ -55,7 +55,7 @@
           "method": "GET",
           "retries": 3,
           "timeout": 10,
-          "url": "http://localhost:4200/t1/from:content/to:slate/slate-1-portland.jpg",
+          "url": "http://localhost:4200/t1/from:content/to:slate/slate-1-portland-213x120.jpg",
           "headers": {
             "Content-Type": "application/json"
           },
@@ -68,7 +68,7 @@
       "to": "slate",
       "to_context": {
         "slate_context": {
-          "slate_url": "file://./resources/slate_fixtures/slate-2-grandcanyon.jpg"
+          "slate_url": "file://./resources/slate_fixtures/slate-2-grandcanyon-213x120.jpg"
         }
       },
       "actions": [
@@ -78,7 +78,7 @@
           "method": "PATCH",
           "retries": 3,
           "timeout": 10,
-          "url": "http://localhost:4200/t2/from:content/to:slate/slate-2-grandcanyon.jpg",
+          "url": "http://localhost:4200/t2/from:content/to:slate/slate-2-grandcanyon-213x120.jpg",
           "body": "{\"updated\":\"field\"}"
         }
       ]
@@ -88,7 +88,7 @@
       "to": "slate",
       "to_context": {
         "slate_context": {
-          "slate_url": "file://./resources/slate_fixtures/slate-3-rust.jpg"
+          "slate_url": "file://./resources/slate_fixtures/slate-3-rust-213x120.jpg"
         }
       },
       "actions": [
@@ -96,7 +96,7 @@
           "description": "Trigger AdBreak using API",
           "type": "http_call",
           "method": "DELETE",
-          "url": "http://localhost:4200/t3/from:content/to:slate/slate-3-rust.jpg"
+          "url": "http://localhost:4200/t3/from:content/to:slate/slate-3-rust-213x120.jpg"
         }
       ]
     },
@@ -105,7 +105,7 @@
       "to": "slate",
       "to_context": {
         "slate_context": {
-          "slate_url": "file://./resources/slate_fixtures/slate-4-gogopher.jpg"
+          "slate_url": "file://./resources/slate_fixtures/slate-4-gogopher-213x120.jpg"
         }
       },
       "actions": [
@@ -113,7 +113,7 @@
           "description": "Trigger AdBreak using API",
           "type": "http_call",
           "method": "DELETE",
-          "url": "http://localhost:4200/t4/from:content/to:slate/slate-4-gogopher.jpg"
+          "url": "http://localhost:4200/t4/from:content/to:slate/slate-4-gogopher-213x120.jpg"
         }
       ]
     },
@@ -122,7 +122,7 @@
       "to": "slate",
       "to_context": {
         "slate_context": {
-          "slate_url": "file://./resources/slate_fixtures/slate-5-gstreamer.jpg"
+          "slate_url": "file://./resources/slate_fixtures/slate-5-gstreamer-213x120.jpg"
         }
       },
       "actions": [
@@ -130,7 +130,7 @@
           "description": "Trigger AdBreak using API",
           "type": "http_call",
           "method": "DELETE",
-          "url": "http://localhost:4200/t5/from:content/to:slate/slate-5-gstreamer.jpg"
+          "url": "http://localhost:4200/t5/from:content/to:slate/slate-5-gstreamer-213x120.jpg"
         }
       ]
     },
@@ -139,7 +139,7 @@
       "to": "slate",
       "to_context": {
         "slate_context": {
-          "slate_url": "file://./resources/slate_fixtures/slate-6-cbsviacom.jpg"
+          "slate_url": "file://./resources/slate_fixtures/slate-6-cbsviacom-213x120.jpg"
         }
       },
       "actions": [
@@ -147,7 +147,7 @@
           "description": "Trigger AdBreak using API",
           "type": "http_call",
           "method": "DELETE",
-          "url": "http://localhost:4200/t6/from:content/to:slate/slate-6-cbsviacom.jpg"
+          "url": "http://localhost:4200/t6/from:content/to:slate/slate-6-cbsviacom-213x120.jpg"
         }
       ]
     },
@@ -156,7 +156,7 @@
       "to": "slate",
       "to_context": {
         "slate_context": {
-          "slate_url": "file://./resources/slate_fixtures/slate-7.png"
+          "slate_url": "file://./resources/slate_fixtures/slate-7-213x120.png"
         }
       },
       "actions": [
@@ -164,7 +164,7 @@
           "description": "Trigger AdBreak using API",
           "type": "http_call",
           "method": "DELETE",
-          "url": "http://localhost:4200/t7/from:content/to:slate/slate-7.png"
+          "url": "http://localhost:4200/t7/from:content/to:slate/slate-7-213x120.png"
         }
       ]
     },
@@ -173,7 +173,7 @@
       "to": "slate",
       "to_context": {
         "slate_context": {
-          "slate_url": "file://./resources/slate_fixtures/slate-8.png"
+          "slate_url": "file://./resources/slate_fixtures/slate-8-213x120.png"
         }
       },
       "actions": [
@@ -181,7 +181,7 @@
           "description": "Trigger AdBreak using API",
           "type": "http_call",
           "method": "DELETE",
-          "url": "http://localhost:4200/t8/from:content/to:slate/slate-8.png"
+          "url": "http://localhost:4200/t8/from:content/to:slate/slate-8-213x120.png"
         }
       ]
     }
