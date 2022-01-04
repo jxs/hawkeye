@@ -3,7 +3,7 @@
   "description": "Multiple slates, each with both a content->slate and slate->content transition",
   "status": "running",
   "source": {
-    "ingest_port": 5002,
+    "ingest_port": 5001,
     "container": "mpeg-ts",
     "codec": "h264",
     "transport": {
