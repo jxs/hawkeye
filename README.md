@@ -45,13 +45,6 @@ header `Authorization: Bearer {token}`.
 
 ## Running locally
 
-The full Hawkeye application consists of:
-
-1.
-2. Workers that watch an RTP (udpsrc) stream for content/slate transitions,
-   matching that slate against the running Watcher's configured slates,
-   and the firing that slate's actions
-
 > Data is persisted via utilizing Kubernetes metadata to store and retrieve relational
 > data.
 
