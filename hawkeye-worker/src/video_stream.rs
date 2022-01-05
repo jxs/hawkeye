@@ -85,8 +85,6 @@ pub fn process_frames(
 
             matched_slate = slate_detector.matched_slate(local_buffer.as_slice());
 
-            // is_match will be the result of
-
             let took_in_seconds = t.stop_and_record();
             log::trace!("Similarity algorithm ran in {} seconds", took_in_seconds);
         }
@@ -104,22 +102,25 @@ pub fn process_frames(
             continue;
         }
 
-        let slate_context = matched_slate
-            .and_then(|s| s.transition.as_ref())
-            .and_then(|t| t.to_context.as_ref())
-            .and_then(|tc| tc.slate_context.clone());
 
         // If the frame matched a slate, then start the Slate workflow.
-        if matched_slate.is_some() {
-            log::trace!("Found slate image in video stream!");
-            FOUND_SLATE_COUNTER.inc();
-            let blah = TransitionChange::new(Event::Mode(VideoMode::Slate), slate_context);
-            action_sink.send(blah).unwrap();
-        } else {
-            log::trace!("Content in video stream!");
-            FOUND_CONTENT_COUNTER.inc();
-            let blah = TransitionChange::new(Event::Mode(VideoMode::Content), slate_context);
-            action_sink.send(blah).unwrap();
+        match matched_slate {
+            Some(_) => {
+                log::trace!("Found slate image in video stream!");
+                FOUND_SLATE_COUNTER.inc();
+                let slate_context = matched_slate
+                    .and_then(|s| s.transition.as_ref())
+                    .and_then(|t| t.to_context.as_ref())
+                    .and_then(|tc| tc.slate_context.clone());
+                let tchange = TransitionChange::new(Event::Mode(VideoMode::Slate), slate_context);
+                action_sink.send(tchange).unwrap()
+            },
+            None => {
+                log::trace!("Content in video stream!");
+                FOUND_CONTENT_COUNTER.inc();
+                let tchange = TransitionChange::new(Event::Mode(VideoMode::Content), None);
+                action_sink.send(tchange).unwrap();
+            },
         }
 
         SIMILARITY_EXECUTION_COUNTER.inc();

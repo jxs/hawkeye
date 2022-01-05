@@ -46,9 +46,6 @@ pub fn watcher_create(
         .and(json_body())
         .and(with_client(client))
         .and_then(handlers::create_watcher)
-
-    // .or_else(|e| Err(warp::reject::custom(e.into())))
-    // .or_else(|e| Err(warp::reject::custom::<FieldError>(e.into())))
 }
 
 /// GET /v1/watchers/{id}
