@@ -389,7 +389,7 @@ pub async fn start_watcher(id: String, client: Client) -> Result<impl warp::Repl
         Status::Ready => {
             // Start Watcher by setting Kubernetes deployment replicas=1
             let mut patch_params = PatchParams::default();
-            patch_params.field_manager = Option::from("hawkeye_api".to_string());
+            patch_params.field_manager = Some("hawkeye_api".to_string());
 
             // Set Kubernetes deployment replica=1 via patch.
             let deployment_scale_json = json!({
