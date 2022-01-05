@@ -102,7 +102,6 @@ pub fn process_frames(
             continue;
         }
 
-
         // If the frame matched a slate, then start the Slate workflow.
         match matched_slate {
             Some(_) => {
@@ -114,13 +113,13 @@ pub fn process_frames(
                     .and_then(|tc| tc.slate_context.clone());
                 let tchange = TransitionChange::new(Event::Mode(VideoMode::Slate), slate_context);
                 action_sink.send(tchange).unwrap()
-            },
+            }
             None => {
                 log::trace!("Content in video stream!");
                 FOUND_CONTENT_COUNTER.inc();
                 let tchange = TransitionChange::new(Event::Mode(VideoMode::Content), None);
                 action_sink.send(tchange).unwrap();
-            },
+            }
         }
 
         SIMILARITY_EXECUTION_COUNTER.inc();
