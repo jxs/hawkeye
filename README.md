@@ -9,13 +9,48 @@ video feed.
 
 ![Diagram showing usage of Hawkeye](resources/HawkeyeDesign.jpg)
 
+## Components
+
+### API
+
+The REST API _basically_ exists to manage Workers, but also serves up healthcheck and
+prometheus metrics endpoints.
+
+When you create a Watcher by doing a `POST /v1/watchers`, the API will create some
+Kubernetes artifacts: ConfigMap, Deployment, Service. These items are to support
+starting the Watcher in Kubernetes, but they also contain metadata that is used to tie
+these resources back to a specific Watcher config. When you do a `GET /v1/watchers`,
+the endpoint just reads various Kubernetes metadata to build the listing. When you do a
+`DELETE /v1/watchers/{uuid}`, then the Kubernetes artifacts are deleted. Kubernetes is
+the current backend, basically.
+
+After creating a Watcher, notice it is in `status=pending`. You have to "start" it using
+`POST /v1/watchers/{uuid}/start`. The status should then update to `status=running`.
+
+*The Kubernetes service will run a Docker image that is expected to be pre-built.*
+The default value for this image name is `hawkeye-worker:latest` and may be overridden
+by setting the environment variable `HAWKEYE_DOCKER_IMAGE` when starting the API.
+To build:
+
+```shell
+docker build -f worker.Dockerfile -t hawkeye-worker .
+```
+
+The API currently only supports a hardcoded header token for authentication.
+(there are open issues to make this better...).  Be sure to set the environment variable
+`HAWKEYE_FIXED_TOKEN` and use it in all API requests by supplying the typical auth
+header `Authorization: Bearer {token}`.
+
+### Watcher
+
 ## Running locally
 
 The full Hawkeye application consists of:
 
-1. a REST API that manages Workers
-2. Workers that watch a stream for slates of interest, with each slate match firing
-   events unique to it.
+1.
+2. Workers that watch an RTP (udpsrc) stream for content/slate transitions,
+   matching that slate against the running Watcher's configured slates,
+   and the firing that slate's actions
 
 > Data is persisted via utilizing Kubernetes metadata to store and retrieve relational
 > data.
@@ -26,7 +61,8 @@ There are multiple ways to run these components locally.
   a Kubernetes deployment and a "Watcher service" that runs a worker that digests
   a stream source to look for the configured slates (and fire the associated actions
   for that slate...).
-- You may forgo the API abstraction and call a Watcher with a hardcoded config directly:
+- You may forgo the API abstraction and create an on-the-fly Watch by using a hardcoded
+  config directly:
   ```shell
   cargo build --bin hawkeye-worker
   ./target/debug/hawkeye-worker fixtures/watcher-basic.json
@@ -73,17 +109,100 @@ apt-get install -y --no-install-recommends \
   gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly
 ```
 
-### Streaming Video
+### Streaming Prepared Video
 
-You can easily stream prepared media via `ffmpeg` to a Watcher to test functionality.
+You can easily stream (RTP, udpsrc) prepared media via `ffmpeg` to a Watcher to test
+functionality and dev changes.
 
-For example, you might have a set of slates configured on a Watcher and a custom video
-clip that alternates playing a video with the slates spliced in. If you wanted to test
-end-to-end, you'd want to stream this video to a Watcher and verify the configured
-actions take place for each transition.
+> `ffmpeg` is a popular app, so it'll be in whatever package manager you use.
+
+The prepared video might be a custom video clip that plays a video clip of your
+choosing, but with the slates that were configured against a Watcher spliced in to the
+video clip.
 
 ```shell
-brew install ffmpeg
+# bs = black slate. optional, but tests more functionality.
+| bs | ...content... | bs | slate1.jpg | bs | ...content... | bs | slate2.png | bs |
+```
+You can get notified of it "working" by reading `RUST_LOG=debug` output or setting up
+the actions for a slate transition to call a URL to a web server that you control.
+
+> You can even use something like https://github.com/LyleScott/blackhole which starts
+> a basic Python webserver that will print out request details as they are made against
+> the server, regardless of endpoint, HTTP verb, or payload.
+
+To test API -> Watcher functionality end-to-end, you'll need to start the `hawkeye-api`
+and do a `POST http://localhost:8080/v1/watchers` with something like:
+
+```json
+{
+  "description": "test watcher",
+  "source": {
+    "ingest_port": 5000,
+    "container": "mpeg-ts",
+    "codec": "h264",
+    "transport": {
+      "protocol": "rtp"
+    }
+  },
+  "transitions": [
+    {
+      "from": "content",
+      "from_context": null,
+      "to": "slate",
+      "to_context": {
+        "slate_context": {
+          "slate_url": "file://./resources/slate_fixtures/slate-0-cbsaa-213x120.jpg"
+        }
+      },
+      "actions": [
+        {
+          "description": "Trigger AdBreak using API",
+          "type": "http_call",
+          "method": "POST",
+          "retries": 3,
+          "timeout": 10,
+          "url": "http://non-existent.cbs.com/v1/organization/cbsa/channel/slate4/ad-break",
+          "authorization": {
+            "basic": {
+              "username": "dev_user",
+              "password": "something"
+            }
+          },
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": "{\"duration\":300}"
+        }
+      ]
+    },
+    {
+      "from": "slate",
+      "from_context": {
+        "slate_context": {
+          "slate_url": "file://./resources/slate_fixtures/slate-0-cbsaa-213x120.jpg"
+        }
+      },
+      "to": "content",
+      "to_context": null,
+      "actions": [
+        {
+          "description": "Use dump out of AdBreak API call",
+          "type": "http_call",
+          "method": "DELETE",
+          "timeout": 10,
+          "url": "http://non-existent.cbs.com/v1/organization/cbsa/channel/slate4/ad-break",
+          "authorization": {
+            "basic": {
+              "username": "dev_user",
+              "password": "something"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
 ```
 
 Save the following script to file to easily stream video files or run the `ffmpeg`
@@ -93,10 +212,11 @@ command yourself. Don't forget to `chmod +x <your-script-name.sh>` to make life 
 #!/usr/bin/env bash
 
 file=$1
-port=$2
-if [[ -z $file ]] || [[ -z $port ]]; then
+host=$2
+port=$3
+if [[ -z $file ]] || [[ -z $host ]] || [[ -z $port ]]; then
     me=$(basename $0)
-    echo "USAGE: ${me} <path-to-video-file> <port>"
+    echo "USAGE: ${me} <path-to-video-file> <host> <port>"
     exit 1
 fi
 
@@ -107,7 +227,7 @@ ffmpeg \
     -an \
     -c:v copy \
     -f rtp_mpegts \
-    udp://0.0.0.0:${port}
+    udp://${host}:${port}
 ```
 
 ## Prometheus Metrics
