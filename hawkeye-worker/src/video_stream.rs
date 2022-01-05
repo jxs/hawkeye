@@ -76,7 +76,6 @@ pub fn process_frames(
         let is_black = black_detector
             .matched_slate(local_buffer.as_slice())
             .is_some();
-        log::debug!("process_frames is_black={}", is_black);
 
         let mut matched_slate: Option<&Slate> = None;
 

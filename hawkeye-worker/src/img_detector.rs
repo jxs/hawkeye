@@ -14,12 +14,13 @@ pub struct Slate {
 
 impl Slate {
     /// Create a new Slate using the image bytes and the selected similarity algorithm.
-    /// Note: similarity_algorithm can only be `dssim::Dssim` at the moment, so this is essentially
-    /// hardcoded in type and value.
+    /// Note: similarity_algorithm can only be `dssim::Dssim` at the moment, so this is
+    /// essentially hardcoded in type and value.
     pub fn new(slate_data: &[u8], transition: Option<Transition>) -> Result<Self> {
         let slate_img = load_data(slate_data)?;
 
-        // There's only one algo at the moment, so hardcode it instead of making it an argument.
+        // There's only one algo at the moment, so hardcode it instead of making it an
+        // argument.
         let similarity_algorithm = dssim::Dssim::new();
         let slate = similarity_algorithm.create_image(&slate_img).unwrap();
 
@@ -30,6 +31,7 @@ impl Slate {
         })
     }
 
+    /// Compare the the slate's image to the frame's image via DSSIM.
     pub fn is_match(&self, frame: &DssimImage<f32>) -> (bool, u32) {
         let (res, _) = self.similarity_algorithm.compare(&self.slate, frame);
         let val: f64 = res.into();
@@ -58,6 +60,9 @@ impl SlateDetector {
         })
     }
 
+    /// Attempt to find a slate that most closely resembles the incoming
+    /// `image_buffer`. If there's more than a single match, the one with lowest score
+    /// is taken (the "most" matched).
     pub fn matched_slate(&self, image_buffer: &[u8]) -> Option<&Slate> {
         let frame_img = load_data(image_buffer).unwrap();
         let frame = self.similarity_algorithm.create_image(&frame_img).unwrap();
@@ -66,13 +71,44 @@ impl SlateDetector {
             .filter_map(|slate| {
                 let (is_match, match_score) = slate.is_match(&frame);
                 match is_match {
-                    true => Some((slate, match_score)),
+                    true => {
+                        let slate_url = slate
+                            .transition
+                            .as_ref()
+                            .and_then(|t| t.from_context.as_ref())
+                            .and_then(|fc| fc.slate_context.as_ref())
+                            .map(|sc| sc.slate_url.as_str())
+                            .unwrap_or_else(|| {
+                                // The slate_url wasn't found in the "from" context, so try to "to"
+                                // context.
+                                slate
+                                    .transition
+                                    .as_ref()
+                                    .and_then(|t| t.to_context.as_ref())
+                                    .and_then(|tc| tc.slate_context.as_ref())
+                                    .map(|sc| sc.slate_url.as_str())
+                                    .unwrap_or("black_slate")
+                            });
+                        log::debug!(
+                            "is_match matched a slate: score={} url={}",
+                            match_score,
+                            slate_url,
+                        );
+                        Some((slate, match_score, slate_url))
+                    }
                     false => None,
                 }
             })
-            .sorted_by_key(|slate_and_score| slate_and_score.1)
+            .sorted_by_key(|slate_score_data| slate_score_data.1)
             .next()
-            .and_then(|s| Option::from(s.0))
+            .and_then(|(slate, score, slate_url)| {
+                log::debug!(
+                    "is_match winning matched slate: score={} url={}",
+                    score,
+                    slate_url,
+                );
+                Option::from(slate)
+            })
     }
 }
 

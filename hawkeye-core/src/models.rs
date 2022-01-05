@@ -21,7 +21,6 @@ pub struct Watcher {
 
 impl Watcher {
     pub fn is_valid(&self) -> Result<()> {
-        log::error!("Watcher is_valid called...");
         self.transitions
             .clone()
             .into_iter()
