@@ -68,10 +68,6 @@ pub async fn create_watcher(
             reply::json(&fe),
             StatusCode::UNPROCESSABLE_ENTITY,
         ));
-        // TODO: we can return Ok(fe) here if we remove the reply::json below. With both enabled,
-        // the compile will error since the return type of Ok(fe) and the reply::with_status below
-        // are two different types.
-        // return Ok(fe)
     }
 
     let new_id = Uuid::new_v4().to_string();

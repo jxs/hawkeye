@@ -339,15 +339,15 @@ mod tests {
                     ]
                 },
                 Transition {
-                from: VideoMode::Slate,
-                from_context: Option::from(FromContext {
-                    slate_context: Option::from(SlateContext {
-                        slate_url: "file://./resources/slate_fixtures/slate-0-cbsaa-213x120.jpg".to_string()
-                    })
-                }),
-                to: VideoMode::Content,
-                to_context: None,
-                actions: vec ![
+                    from: VideoMode::Slate,
+                    from_context: Option::from(FromContext {
+                        slate_context: Option::from(SlateContext {
+                            slate_url: "file://./resources/slate_fixtures/slate-0-cbsaa-213x120.jpg".to_string()
+                        })
+                    }),
+                    to: VideoMode::Content,
+                    to_context: None,
+                    actions: vec ![
                         Action::HttpCall( HttpCall {
                             description: Some("Use dump out of AdBreak API call".to_string()),
                             method: HttpMethod::DELETE,
