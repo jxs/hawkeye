@@ -164,7 +164,6 @@ impl Serialize for ErrorResponse {
     {
         let mut state = serializer.serialize_struct("ErrorResponse", 2)?;
         state.serialize_field("message", &self.message)?;
-        // state.serialize_field("code", &self.code.as_u16())?;
         state.end()
     }
 }
