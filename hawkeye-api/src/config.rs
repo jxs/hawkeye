@@ -27,8 +27,6 @@ lazy_static! {
 
     pub static ref CALL_WATCHER_TIMEOUT: u64 =
         std::env::var(CALL_WATCHER_TIMEOUT_ENV).map(|val| val.parse::<u64>()).unwrap_or_else(|_| Ok(DEFAULT_CALL_WATCHER_TIMEOUT)).unwrap_or(DEFAULT_CALL_WATCHER_TIMEOUT);
-
-    // pub static ref SLATE_URL_FILE_EXTENSIONS: Vec<&str> = std::env::var(SLATE_URL_FILE_EXTENSIONS_ENV).unwrap_or_else(|s| "http,https").as_str().split(",").collect()
 }
 
 /// In case the environment variable `HAWKEYE_FIXED_TOKEN` is not present, a
