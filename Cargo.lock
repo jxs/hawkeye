@@ -1089,7 +1089,7 @@ dependencies = [
 
 [[package]]
 name = "hawkeye-api"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "eyre",
@@ -1110,7 +1110,7 @@ dependencies = [
 
 [[package]]
 name = "hawkeye-core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "color-eyre",
  "lazy_static",
@@ -1124,7 +1124,7 @@ dependencies = [
 
 [[package]]
 name = "hawkeye-worker"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "color-eyre",
  "concread",
