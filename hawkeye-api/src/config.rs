@@ -26,7 +26,7 @@ lazy_static! {
         std::env::var(FIXED_TOKEN_ENV).unwrap_or_else(|_| gen_token());
 
     pub static ref CALL_WATCHER_TIMEOUT: u64 =
-        std::env::var(CALL_WATCHER_TIMEOUT_ENV).map(|val| val.parse::<u64>()).unwrap_or_else(|_| Ok(DEFAULT_CALL_WATCHER_TIMEOUT)).unwrap_or(DEFAULT_CALL_WATCHER_TIMEOUT);
+        std::env::var(CALL_WATCHER_TIMEOUT_ENV).map(|val| val.parse::<u64>()).unwrap_or_else(|_| Ok(DEFAULT_CALL_WATCHER_TIMEOUT)).unwrap_or_else(|_| DEFAULT_CALL_WATCHER_TIMEOUT);
 }
 
 /// In case the environment variable `HAWKEYE_FIXED_TOKEN` is not present, a
