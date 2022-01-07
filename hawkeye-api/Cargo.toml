@@ -1,14 +1,15 @@
 [package]
 name = "hawkeye-api"
 version = "0.1.0"
-authors = ["Rafael Caricio <rafael@caricio.com>"]
+authors = ["Rafael Caricio <rafael@caricio.com>", "Lyle Scott <lyle@ls3.io>"]
 edition = "2018"
-
+license = "MIT"
+repository = "https://github.com/cbsinteractive/hawkeye"
 
 [dependencies]
+eyre = "0.6.5"
 log = "0.4"
 pretty_env_logger = "0.4"
-structopt = "0.3"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 kube = { version = "0.64.0", features = ["native-tls", "runtime"] }
@@ -16,9 +17,8 @@ k8s-openapi = { version = "0.13.1", default-features = false, features = ["v1_22
 tokio = { version = "1.14", features = ["full"] }
 warp = "0.3"
 reqwest = { version = "0.10", features = ["json"] }
-prometheus = "0.10.0"
 lazy_static = "1.4.0"
 hawkeye-core = { path = "../hawkeye-core" }
-anyhow = "1.0.32"
-uuid = { version = "0.8.1", features = ["v4"] }
+anyhow = "1.0.51"
+uuid = { version = "0.8.2", features = ["v4"] }
 rand = "0.7.3"
