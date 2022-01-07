@@ -223,8 +223,6 @@ async fn handle_rejection(
             None => "an unknown server error has occurred".to_string(),
         }
     });
-    let json = warp::reply::json(&ErrorResponse {
-        message: message.to_string(),
-    });
+    let json = warp::reply::json(&ErrorResponse { message });
     Ok(warp::reply::with_status(json, code))
 }
