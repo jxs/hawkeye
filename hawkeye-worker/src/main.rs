@@ -84,7 +84,6 @@ fn main() -> Result<()> {
     })
     .expect("Error setting termination handler");
 
-    // let detector = SlateDetector::new(&slate::load_img(watcher.slate_url.as_str())?)?;
     let slate_detector = SlateDetector::new(to_slates)?;
 
     // Configure the video stream for the Watcher to "watch" for slates of interest.
