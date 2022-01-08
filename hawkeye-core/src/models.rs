@@ -22,8 +22,7 @@ pub struct Watcher {
 impl Watcher {
     pub fn is_valid(&self) -> Result<()> {
         self.transitions
-            .clone()
-            .into_iter()
+            .iter()
             .try_for_each(|t| t.is_valid())
             // Validate the source.
             .and(self.source.is_valid())
