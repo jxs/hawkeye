@@ -101,13 +101,14 @@ impl SlateDetector {
             })
             .sorted_by_key(|slate_score_data| slate_score_data.1)
             .next()
-            .and_then(|(slate, score, slate_url)| {
+            .map(|(slate, score, slate_url)| {
                 log::debug!(
                     "is_match winning matched slate: score={} url={}",
                     score,
                     slate_url,
                 );
-                Some(slate)
+
+                slate
             })
     }
 }

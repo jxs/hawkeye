@@ -10,7 +10,7 @@ lazy_static! {
         std::env::var(HAWKEYE_ENV_ENV).unwrap_or_else(|_| "local".into());
     pub static ref SLATE_URL_FILE_EXTENSIONS: Vec<String> = std::env::var(SLATE_URL_FILE_EXTS_ENV)
         .unwrap_or_else(|_| "jpg,jpeg,png".into())
-        .split(",")
+        .split(',')
         .map(|a| a.trim().to_string())
         .collect();
     pub static ref SLATE_URL_SCHEMES: Vec<String> = std::env::var(SLATE_URL_SCHEMES_ENV)
@@ -20,7 +20,7 @@ lazy_static! {
                 _ => "http,https,file".to_string(),
             }
         })
-        .split(",")
+        .split(',')
         .map(|a| a.trim().to_string())
         .collect();
 }

@@ -168,7 +168,7 @@ impl ActionExecution for HttpCall {
     fn execute(&mut self) -> Result<()> {
         let mut tries = 0;
         loop {
-            match try_call(&self) {
+            match try_call(self) {
                 Ok(_) => break,
                 Err(err) => {
                     HTTP_CALL_RETRIED_COUNT.inc();

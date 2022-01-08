@@ -197,7 +197,7 @@ async fn handle_rejection(
         } else {
             code = StatusCode::BAD_REQUEST;
         }
-    } else if let Some(_) = err.find::<warp::reject::MethodNotAllowed>() {
+    } else if err.find::<warp::reject::MethodNotAllowed>().is_some() {
         code = StatusCode::METHOD_NOT_ALLOWED;
     } else {
         log::debug!("Unhandled rejection: {:?}", err);
