@@ -317,8 +317,8 @@ mod tests {
                     from: VideoMode::Content,
                     from_context: None,
                     to: VideoMode::Slate,
-                    to_context: Option::from(ToContext {
-                        slate_context: Option::from(SlateContext {
+                    to_context: Some(ToContext {
+                        slate_context: Some(SlateContext {
                             slate_url: "file://./resources/slate_fixtures/slate-0-cbsaa-213x120.jpg".to_string()
                         })
                     }),
@@ -340,8 +340,8 @@ mod tests {
                 },
                 Transition {
                     from: VideoMode::Slate,
-                    from_context: Option::from(FromContext {
-                        slate_context: Option::from(SlateContext {
+                    from_context: Some(FromContext {
+                        slate_context: Some(SlateContext {
                             slate_url: "file://./resources/slate_fixtures/slate-0-cbsaa-213x120.jpg".to_string()
                         })
                     }),

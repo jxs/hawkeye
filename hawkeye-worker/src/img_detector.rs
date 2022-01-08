@@ -107,7 +107,7 @@ impl SlateDetector {
                     score,
                     slate_url,
                 );
-                Option::from(slate)
+                Some(slate)
             })
     }
 }
