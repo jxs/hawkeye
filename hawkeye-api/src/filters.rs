@@ -2,8 +2,7 @@ use crate::{auth, handlers};
 use eyre::ErrReport;
 use hawkeye_core::models::Watcher;
 use kube::Client;
-use serde::ser::SerializeStruct;
-use serde::{Serialize, Serializer};
+use serde::Serialize;
 use std::fmt::Display;
 use warp::hyper::StatusCode;
 use warp::reply::Response;
@@ -136,7 +135,7 @@ fn json_body() -> impl Filter<Extract = (Watcher,), Error = warp::Rejection> + C
 }
 
 /// An API error serializable to JSON.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ErrorResponse {
     pub message: String,
 }
@@ -154,17 +153,6 @@ impl ErrorResponse {
         Self {
             message: message.as_ref().to_string(),
         }
-    }
-}
-
-impl Serialize for ErrorResponse {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let mut state = serializer.serialize_struct("ErrorResponse", 2)?;
-        state.serialize_field("message", &self.message)?;
-        state.end()
     }
 }
 
