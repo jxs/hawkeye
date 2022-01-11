@@ -142,10 +142,10 @@ pub struct FromContext {
 impl FromContext {
     pub fn is_valid(&self, state: &VideoMode) -> Result<()> {
         if state == &VideoMode::Slate {
-            match &self.slate_context {
-                Some(slate) => slate.is_valid(),
-                None => Err(eyre!("A `slate_context` is required for from=Slate")),
-            }
+            self.slate_context
+                .map(|slate| slate.is_valid())
+                .ok_or_else(|| Err(eyre!("A `slate_context` is required for from=Slate")))
+                .flatten()?
         } else {
             Ok(())
         }
