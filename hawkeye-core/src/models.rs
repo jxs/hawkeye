@@ -93,8 +93,7 @@ pub struct Transition {
 
 impl Transition {
     fn is_valid(&self) -> Result<()> {
-        self.validate_from_context()
-            .and(self.validate_to_context())
+        self.validate_from_context().and(self.validate_to_context())
     }
 
     fn validate_from_context(&self) -> Result<()> {
@@ -107,7 +106,8 @@ impl Transition {
             // FromContext is only valid for from=slate at the moment.
             match self.from_context {
                 Some(_) => Err(eyre!(
-                    "A `from_context` is not supported for `from={:?}'", self.from
+                    "A `from_context` is not supported for `from={:?}'",
+                    self.from
                 )),
                 None => Ok(()),
             }
@@ -124,7 +124,8 @@ impl Transition {
             // ToContext is only valid for to=slate at the moment.
             match self.to_context {
                 Some(_) => Err(eyre!(
-                    "A `to_context` is not supported for 'to={:?}'", self.to
+                    "A `to_context` is not supported for 'to={:?}'",
+                    self.to
                 )),
                 None => Ok(()),
             }

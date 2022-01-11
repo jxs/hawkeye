@@ -18,7 +18,8 @@ lazy_static! {
             match HAWKEYE_ENV.as_str() {
                 "prod" => "http,https",
                 _ => "http,https,file",
-            }.to_string()
+            }
+            .to_string()
         })
         .split(',')
         .map(|a| a.trim().to_string())
