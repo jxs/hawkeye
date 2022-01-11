@@ -93,40 +93,38 @@ pub struct Transition {
 
 impl Transition {
     fn is_valid(&self) -> Result<()> {
-        self._validate_from_context()
-            .and(self._validate_to_context())
+        self.validate_from_context()
+            .and(self.validate_to_context())
     }
 
-    fn _validate_from_context(&self) -> Result<()> {
+    fn validate_from_context(&self) -> Result<()> {
         if self.from == Slate {
-            match self.from_context.as_ref() {
-                Some(fc) => fc.is_valid(&self.from),
-                None => Err(eyre!("A `from_context` is required for from=Slate")),
-            }
+            self.from_context
+                .as_ref()
+                .ok_or_else(|| eyre!("A `from_context` is required for from=slate"))
+                .and_then(|fc| fc.is_valid(&self.from))
         } else {
             // FromContext is only valid for from=slate at the moment.
             match self.from_context {
                 Some(_) => Err(eyre!(
-                    "A `from_context` is not supported for the `from` state of {:?}",
-                    self.from
+                    "A `from_context` is not supported for `from={:?}'", self.from
                 )),
                 None => Ok(()),
             }
         }
     }
 
-    fn _validate_to_context(&self) -> Result<()> {
+    fn validate_to_context(&self) -> Result<()> {
         if self.to == Slate {
-            match self.to_context.as_ref() {
-                Some(fc) => fc.is_valid(&self.from),
-                None => Err(eyre!("A `to_context` is required for to=Slate")),
-            }
+            self.to_context
+                .as_ref()
+                .ok_or_else(|| eyre!("A `to_context` is required for to=slate"))
+                .and_then(|tc| tc.is_valid(&self.to))
         } else {
             // ToContext is only valid for to=slate at the moment.
             match self.to_context {
                 Some(_) => Err(eyre!(
-                    "A `to_context` is not supported for the `to` state of {:?}",
-                    self.to
+                    "A `to_context` is not supported for 'to={:?}'", self.to
                 )),
                 None => Ok(()),
             }
@@ -142,10 +140,11 @@ pub struct FromContext {
 impl FromContext {
     pub fn is_valid(&self, state: &VideoMode) -> Result<()> {
         if state == &VideoMode::Slate {
+            // Require `slate_context`.
             self.slate_context
-                .map(|slate| slate.is_valid())
-                .ok_or_else(|| Err(eyre!("A `slate_context` is required for from=Slate")))
-                .flatten()?
+                .as_ref()
+                .ok_or_else(|| eyre!("A `slate_context` is required for from=slate"))
+                .and_then(|sc| sc.is_valid())
         } else {
             Ok(())
         }
@@ -160,10 +159,11 @@ pub struct ToContext {
 impl ToContext {
     pub fn is_valid(&self, state: &VideoMode) -> Result<()> {
         if state == &VideoMode::Slate {
-            match &self.slate_context {
-                Some(slate) => slate.is_valid(),
-                None => Err(eyre!("A `slate_context` is required for to=Slate")),
-            }
+            // Require `slate_context`.
+            self.slate_context
+                .as_ref()
+                .ok_or_else(|| eyre!("A `slate_context` is required for to=slate"))
+                .and_then(|sc| sc.is_valid())
         } else {
             Ok(())
         }
