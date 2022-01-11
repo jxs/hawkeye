@@ -16,9 +16,9 @@ lazy_static! {
     pub static ref SLATE_URL_SCHEMES: Vec<String> = std::env::var(SLATE_URL_SCHEMES_ENV)
         .unwrap_or_else(|_| {
             match HAWKEYE_ENV.as_str() {
-                "prod" => "http,https".to_string(),
-                _ => "http,https,file".to_string(),
-            }
+                "prod" => "http,https",
+                _ => "http,https,file",
+            }.to_string()
         })
         .split(',')
         .map(|a| a.trim().to_string())
