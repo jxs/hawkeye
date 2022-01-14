@@ -14,8 +14,8 @@ use color_eyre::Result;
 use crossbeam::channel::unbounded;
 use gstreamer as gst;
 use hawkeye_core::models::Watcher;
+use hawkeye_core::utils::maybe_bootstrap_sentry;
 use log::info;
-use pretty_env_logger::env_logger;
 use std::fs::File;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -24,9 +24,12 @@ use structopt::StructOpt;
 
 fn main() -> Result<()> {
     color_eyre::install()?;
-    env_logger::init_from_env(
-        env_logger::Env::default().filter_or(env_logger::DEFAULT_FILTER_ENV, "info"),
-    );
+
+    // `sentry_client` must be in scope in main() to stay alive and functional.
+    let sentry_client = maybe_bootstrap_sentry();
+    if sentry_client.is_none() {
+        pretty_env_logger::init();
+    }
 
     let config: AppConfig = AppConfig::from_args();
     let watcher_config = File::open(config.watcher_path)?;

@@ -4,6 +4,7 @@ mod filters;
 mod handlers;
 mod templates;
 
+use hawkeye_core::utils::maybe_bootstrap_sentry;
 use kube::Client;
 use std::env;
 use warp::Filter;
@@ -15,7 +16,12 @@ async fn main() -> anyhow::Result<()> {
         // this only shows access logs.
         env::set_var("RUST_LOG", "watchers=info");
     }
-    pretty_env_logger::init();
+
+    // `sentry_client` must be in scope in main() to stay alive and functional.
+    let sentry_client = maybe_bootstrap_sentry();
+    if sentry_client.is_none() {
+        pretty_env_logger::init();
+    }
 
     let client = Client::try_default().await?;
 

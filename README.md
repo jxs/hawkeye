@@ -32,3 +32,11 @@ The Worker expose metrics in the standard `/metrics` path for Prometheus to harv
 ```
 $ curl http://localhost:3030/metrics
 ```
+
+## Environment Variables
+
+| Environment Variable      | Default | Description                                    |
+| ------------------------- | ------- | ---------------------------------------------- |
+| `HAWKEYE_ENV`             | local   | `dev`/`prod`/whatever you want                 |
+| `HAWKEYE_SENTRY_DSN    `  | <none>  | the DSN url to the Sentry project to use       |
+| `HAWKEYE_SENTRY_ENABLED`  | `0`     | `"1"` or `0` will toggle Sentry initialization |
