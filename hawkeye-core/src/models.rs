@@ -1,5 +1,4 @@
 use crate::config::{SLATE_URL_FILE_EXTENSIONS, SLATE_URL_SCHEMES};
-use crate::models::VideoMode::Slate;
 use color_eyre::{eyre::eyre, Result};
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
@@ -85,128 +84,161 @@ pub enum Protocol {
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
 pub struct Transition {
     pub from: VideoMode,
-    pub from_context: Option<FromContext>,
     pub to: VideoMode,
-    pub to_context: Option<ToContext>,
     pub actions: Vec<Action>,
 }
 
 impl Transition {
     fn is_valid(&self) -> Result<()> {
-        self.validate_from_context().and(self.validate_to_context())
+        self.from.is_valid().and(self.to.is_valid())
     }
 
-    fn validate_from_context(&self) -> Result<()> {
-        if self.from == Slate {
-            self.from_context
-                .as_ref()
-                .ok_or_else(|| eyre!("A `from_context` is required for from=slate"))
-                .and_then(|fc| fc.is_valid(&self.from))
-        } else {
-            // FromContext is only valid for from=slate at the moment.
-            match self.from_context {
-                Some(_) => Err(eyre!(
-                    "A `from_context` is not supported for `from={:?}'",
-                    self.from
-                )),
-                None => Ok(()),
-            }
-        }
-    }
+    // fn validate_from(&self) -> Result<()> {
+    //     match self.from {
+    //         VideoMode::Slate { url: _ } =>
+    //     }
+    //
+    //     if (VideoMode::Slate { url: _ }) == self.from {
+    //         self.from_context
+    //             .as_ref()
+    //             .ok_or_else(|| eyre!("A `from_context` is required for from=slate"))
+    //             .and_then(|fc| fc.is_valid(&self.from))
+    //     } else {
+    //         // FromContext is only valid for from=slate at the moment.
+    //         match self.from_context {
+    //             Some(_) => Err(eyre!(
+    //                 "A `from_context` is not supported for `from={:?}'",
+    //                 self.from
+    //             )),
+    //             None => Ok(()),
+    //         }
+    //     }
+    // }
 
-    fn validate_to_context(&self) -> Result<()> {
-        if self.to == Slate {
-            self.to_context
-                .as_ref()
-                .ok_or_else(|| eyre!("A `to_context` is required for to=slate"))
-                .and_then(|tc| tc.is_valid(&self.to))
-        } else {
-            // ToContext is only valid for to=slate at the moment.
-            match self.to_context {
-                Some(_) => Err(eyre!(
-                    "A `to_context` is not supported for 'to={:?}'",
-                    self.to
-                )),
-                None => Ok(()),
-            }
-        }
-    }
+    // fn validate_to(&self) -> Result<()> {
+    //     if self.to == (VideoMode::Slate { url: _ }) {
+    //         self.to_context
+    //             .as_ref()
+    //             .ok_or_else(|| eyre!("A `to_context` is required for to=slate"))
+    //             .and_then(|tc| tc.is_valid(&self.to))
+    //     } else {
+    //         // ToContext is only valid for to=slate at the moment.
+    //         match self.to_context {
+    //             Some(_) => Err(eyre!(
+    //                 "A `to_context` is not supported for 'to={:?}'",
+    //                 self.to
+    //             )),
+    //             None => Ok(()),
+    //         }
+    //     }
+    // }
 }
+
+// #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
+// pub struct FromContext {
+//     pub slate_context: Option<SlateContext>,
+// }
+
+// impl FromContext {
+//     pub fn is_valid(&self, state: &VideoMode) -> Result<()> {
+//         if state == &(VideoMode::Slate { url: _ }) {
+//             // Require `slate_context`.
+//             self.slate_context
+//                 .as_ref()
+//                 .ok_or_else(|| eyre!("A `slate_context` is required for from=slate"))
+//                 .and_then(|sc| sc.is_valid())
+//         } else {
+//             Ok(())
+//         }
+//     }
+// }
+
+// #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
+// pub struct ToContext {
+//     pub slate_context: Option<SlateContext>,
+// }
+
+// impl ToContext {
+//     pub fn is_valid(&self, state: &VideoMode) -> Result<()> {
+//         if state == &(VideoMode::Slate { url: _ }) {
+//             // Require `slate_context`.
+//             self.slate_context
+//                 .as_ref()
+//                 .ok_or_else(|| eyre!("A `slate_context` is required for to=slate"))
+//                 .and_then(|sc| sc.is_valid())
+//         } else {
+//             Ok(())
+//         }
+//     }
+// }
+
+// #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
+// pub struct SlateContext {
+//     pub slate_url: String,
+// }
+
+// impl SlateContext {
+//     fn is_valid(&self) -> Result<()> {
+//         // Validate slate_url particulars.
+//         let parsed = Url::parse(&self.slate_url)?;
+//         let ext = Path::new(parsed.path())
+//             .extension()
+//             .and_then(OsStr::to_str)
+//             .unwrap();
+//         let scheme = parsed.scheme();
+//
+//         if !SLATE_URL_FILE_EXTENSIONS.contains(&ext.to_string()) {
+//             Err(eyre!(
+//                 "Invalid `slate_url` file extension. Valid values are: {}",
+//                 SLATE_URL_FILE_EXTENSIONS.join(", "),
+//             ))
+//         } else if !SLATE_URL_SCHEMES.contains(&scheme.to_string()) {
+//             Err(eyre!(
+//                 "Invalid `slate_url` URL scheme. Valid values are: {}",
+//                 SLATE_URL_SCHEMES.join(", "),
+//             ))
+//         } else {
+//             Ok(())
+//         }
+//     }
+// }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
-pub struct FromContext {
-    pub slate_context: Option<SlateContext>,
-}
-
-impl FromContext {
-    pub fn is_valid(&self, state: &VideoMode) -> Result<()> {
-        if state == &VideoMode::Slate {
-            // Require `slate_context`.
-            self.slate_context
-                .as_ref()
-                .ok_or_else(|| eyre!("A `slate_context` is required for from=slate"))
-                .and_then(|sc| sc.is_valid())
-        } else {
-            Ok(())
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
-pub struct ToContext {
-    pub slate_context: Option<SlateContext>,
-}
-
-impl ToContext {
-    pub fn is_valid(&self, state: &VideoMode) -> Result<()> {
-        if state == &VideoMode::Slate {
-            // Require `slate_context`.
-            self.slate_context
-                .as_ref()
-                .ok_or_else(|| eyre!("A `slate_context` is required for to=slate"))
-                .and_then(|sc| sc.is_valid())
-        } else {
-            Ok(())
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
-pub struct SlateContext {
-    pub slate_url: String,
-}
-
-impl SlateContext {
-    fn is_valid(&self) -> Result<()> {
-        // Validate slate_url particulars.
-        let parsed = Url::parse(&self.slate_url)?;
-        let ext = Path::new(parsed.path())
-            .extension()
-            .and_then(OsStr::to_str)
-            .unwrap();
-        let scheme = parsed.scheme();
-
-        if !SLATE_URL_FILE_EXTENSIONS.contains(&ext.to_string()) {
-            Err(eyre!(
-                "Invalid `slate_url` file extension. Valid values are: {}",
-                SLATE_URL_FILE_EXTENSIONS.join(", "),
-            ))
-        } else if !SLATE_URL_SCHEMES.contains(&scheme.to_string()) {
-            Err(eyre!(
-                "Invalid `slate_url` URL scheme. Valid values are: {}",
-                SLATE_URL_SCHEMES.join(", "),
-            ))
-        } else {
-            Ok(())
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize, Copy, Clone, Debug, Eq, PartialEq)]
 #[serde(rename_all = "lowercase")]
+#[serde(tag = "frame_type", content = "slate_context")]
 pub enum VideoMode {
-    Slate,
+    Slate { url: String },
     Content,
+}
+
+impl VideoMode {
+    pub fn is_valid(&self) -> Result<()> {
+        match self {
+            VideoMode::Slate { url } => {
+                let parsed = Url::parse(url)?;
+                let ext = Path::new(parsed.path())
+                    .extension()
+                    .and_then(OsStr::to_str)
+                    .unwrap();
+                let scheme = parsed.scheme();
+
+                if !SLATE_URL_FILE_EXTENSIONS.contains(&ext.to_string()) {
+                    Err(eyre!(
+                        "Invalid `slate_url` file extension. Valid values are: {}",
+                        SLATE_URL_FILE_EXTENSIONS.join(", "),
+                    ))
+                } else if !SLATE_URL_SCHEMES.contains(&scheme.to_string()) {
+                    Err(eyre!(
+                        "Invalid `slate_url` URL scheme. Valid values are: {}",
+                        SLATE_URL_SCHEMES.join(", "),
+                    ))
+                } else {
+                    Ok(())
+                }
+            }
+            VideoMode::Content => Ok(()),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
@@ -315,13 +347,7 @@ mod tests {
             transitions: vec![
                 Transition {
                     from: VideoMode::Content,
-                    from_context: None,
-                    to: VideoMode::Slate,
-                    to_context: Some(ToContext {
-                        slate_context: Some(SlateContext {
-                            slate_url: "file://./resources/slate_fixtures/slate-0-cbsaa-213x120.jpg".to_string()
-                        })
-                    }),
+                    to: VideoMode::Slate { url: "file://./resources/slate_fixtures/slate-0-cbsaa-213x120.jpg".to_string() },
                     actions: vec![
                         Action::HttpCall( HttpCall {
                             description: Some("Trigger AdBreak using API".to_string()),
@@ -339,14 +365,8 @@ mod tests {
                     ]
                 },
                 Transition {
-                    from: VideoMode::Slate,
-                    from_context: Some(FromContext {
-                        slate_context: Some(SlateContext {
-                            slate_url: "file://./resources/slate_fixtures/slate-0-cbsaa-213x120.jpg".to_string()
-                        })
-                    }),
+                    from: VideoMode::Slate {url: "file://./resources/slate_fixtures/slate-0-cbsaa-213x120.jpg".to_string()},
                     to: VideoMode::Content,
-                    to_context: None,
                     actions: vec ![
                         Action::HttpCall( HttpCall {
                             description: Some("Use dump out of AdBreak API call".to_string()),
