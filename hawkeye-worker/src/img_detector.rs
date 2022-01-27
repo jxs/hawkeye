@@ -1,6 +1,6 @@
 use color_eyre::Result;
 use dssim::{DssimImage, ToRGBAPLU, RGBAPLU};
-use hawkeye_core::models::Transition;
+use hawkeye_core::models::{Transition, VideoMode};
 use imgref::{Img, ImgVec};
 use itertools::Itertools;
 use load_image::{Image, ImageData};
@@ -72,23 +72,32 @@ impl SlateDetector {
                 let (is_match, match_score) = slate.is_match(&frame);
                 match is_match {
                     true => {
-                        let slate_url = slate
-                            .transition
-                            .as_ref()
-                            .and_then(|t| t.from_context.as_ref())
-                            .and_then(|fc| fc.slate_context.as_ref())
-                            .map(|sc| sc.slate_url.as_str())
-                            .unwrap_or_else(|| {
-                                // The slate_url wasn't found in the "from" context, so try to "to"
-                                // context.
-                                slate
-                                    .transition
-                                    .as_ref()
-                                    .and_then(|t| t.to_context.as_ref())
-                                    .and_then(|tc| tc.slate_context.as_ref())
-                                    .map(|sc| sc.slate_url.as_str())
-                                    .unwrap_or("black_slate")
-                            });
+                        let VideoMode::Slate { url: slate_url } = slate.transition.unwrap().from;
+                        let slate_url = match slate.transition.unwrap().from {
+                            VideoMode::Slate { url } => url,
+                            VideoMode::Content => match slate.transition.unwrap().to {
+                                VideoMode::Slate { url } => url,
+                                VideoMode::Content => "black_slate".to_string(),
+                            },
+                        };
+
+                        // let slate_url = slate
+                        //     .transition
+                        //     .as_ref()
+                        //     .and_then(|t| t.from.as_ref())
+                        //     .and_then(|fc| fc.slate_context.as_ref())
+                        //     .map(|sc| sc.slate_url.as_str())
+                        //     .unwrap_or_else(|| {
+                        //         // The slate_url wasn't found in the "from" context, so try to "to"
+                        //         // context.
+                        //         slate
+                        //             .transition
+                        //             .as_ref()
+                        //             .and_then(|t| t.to_context.as_ref())
+                        //             .and_then(|tc| tc.slate_context.as_ref())
+                        //             .map(|sc| sc.slate_url.as_str())
+                        //             .unwrap_or("black_slate")
+                        //     });
                         log::debug!(
                             "is_match matched a slate: score={} url={}",
                             match_score,

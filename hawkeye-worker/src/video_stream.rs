@@ -12,7 +12,7 @@ use gst::element_error;
 use gst::prelude::*;
 use gstreamer as gst;
 use gstreamer_app as gst_app;
-use hawkeye_core::models::{Codec, Container, SlateContext, VideoMode};
+use hawkeye_core::models::{Codec, Container, VideoMode};
 use lazy_static::lazy_static;
 use log::{debug, info};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -33,7 +33,7 @@ struct ErrorMessage {
     source: glib::Error,
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Event {
     Terminate,
     Mode(VideoMode),
@@ -108,15 +108,15 @@ pub fn process_frames(
                 FOUND_SLATE_COUNTER.inc();
                 let slate_context = matched_slate
                     .and_then(|s| s.transition.as_ref())
-                    .and_then(|t| t.to_context.as_ref())
-                    .and_then(|tc| tc.slate_context.clone());
-                let tchange = TransitionChange::new(Event::Mode(VideoMode::Slate), slate_context);
+                    .and_then(|t| Some(t.to))
+                    .unwrap();
+                let tchange = TransitionChange::new(Event::Mode(slate_context));
                 action_sink.send(tchange).unwrap()
             }
             None => {
                 log::trace!("Content in video stream!");
                 FOUND_CONTENT_COUNTER.inc();
-                let tchange = TransitionChange::new(Event::Mode(VideoMode::Content), None);
+                let tchange = TransitionChange::new(Event::Mode(VideoMode::Content));
                 action_sink.send(tchange).unwrap();
             }
         }
@@ -135,7 +135,7 @@ pub fn process_frames(
 
     info!("Stopping pipeline gracefully!");
     // action_sink.send(Event::Terminate)?;
-    let tc = TransitionChange::new(Event::Terminate, None);
+    let tc = TransitionChange::new(Event::Terminate);
     action_sink.send(tc)?;
 
     Ok(())
@@ -369,14 +369,10 @@ impl Drop for VideoStreamIterator {
 #[derive(Debug, Eq, PartialEq)]
 pub struct TransitionChange {
     pub event: Event,
-    pub slate_context: Option<SlateContext>,
 }
 
 impl TransitionChange {
-    pub fn new(event: Event, slate_context: Option<SlateContext>) -> Self {
-        Self {
-            event,
-            slate_context,
-        }
+    pub fn new(event: Event) -> Self {
+        Self { event }
     }
 }
