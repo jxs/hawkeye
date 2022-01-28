@@ -70,8 +70,8 @@ impl ActionExecutor {
     /// Executes the action if the video mode matches the transition and if the action is
     /// allowed to run.
     fn call_action(&mut self, mode: &VideoMode) -> Option<Result<()>> {
-        self.last_mode.and_then(|last_mode| {
-            if TransitionStateChange(last_mode, mode.clone()) == self.transition_change
+        self.last_mode.clone().and_then(|last_mode| {
+            if TransitionStateChange(last_mode.clone(), mode.clone()) == self.transition_change
                 && self.allowed_to_run()
             {
                 Some(self.action.execute())

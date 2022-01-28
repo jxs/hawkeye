@@ -13,7 +13,7 @@ use crate::video_stream::{process_frames, RtpServer};
 use color_eyre::Result;
 use crossbeam::channel::unbounded;
 use gstreamer as gst;
-use hawkeye_core::models::Watcher;
+use hawkeye_core::models::{VideoMode, Watcher};
 use hawkeye_core::utils::maybe_bootstrap_sentry;
 use log::info;
 use std::fs::File;
@@ -28,10 +28,12 @@ fn main() -> Result<()> {
     // `sentry_client` must be in scope in main() to stay alive and functional.
     let sentry_client = maybe_bootstrap_sentry();
     if sentry_client.is_none() {
+        info!("Initializing Sentry...");
         pretty_env_logger::init();
     }
 
     // Initialize an instance of a Watcher.
+    info!("Initializing a Watcher instance...");
     let config: AppConfig = AppConfig::from_args();
     let watcher_config = File::open(config.watcher_path)?;
     let watcher: Watcher = serde_json::from_reader(watcher_config)?;
@@ -49,20 +51,28 @@ fn main() -> Result<()> {
     // Convert each Transition into an Executor (a Vec<ActionExecutor).
     info!("Loading executors..");
     let mut executors: Vec<ActionExecutor> = Vec::new();
-    let mut to_slates: Vec<Slate> = Vec::new();
-    for transition in watcher.transitions.iter() {
-        if let Some(context) = &transition.to_context {
-            if let Some(slate_context) = &context.slate_context {
-                to_slates.push(Slate::new(
-                    &slate::load_img(slate_context.slate_url.as_str())?,
-                    Some(transition.clone()),
-                )?);
+
+    info!("Mapping 'to' slates to transitions...");
+    let to_slates: Vec<Slate> = watcher
+        .transitions
+        .iter()
+        .filter_map(|transition| match &transition.to {
+            VideoMode::Slate { url } => {
+                let slate = Slate::new(
+                    &slate::load_img(url.as_str()).unwrap(),
+                    Some(transition.to_owned()),
+                )
+                .unwrap();
+
+                let mut execs: Executors = transition.clone().into();
+                // QUESTION: Do we only support 1 Action?
+                executors.append(&mut execs.0);
+
+                Some(slate)
             }
-        }
-        let mut execs: Executors = transition.clone().into();
-        // QUESTION: Do we only support 1 Action?
-        executors.append(&mut execs.0);
-    }
+            _ => None,
+        })
+        .collect();
 
     // Start up an Actions Runtime with the built Vec<ActionExecutors> that are per-Transition.
     thread::spawn(move || {
@@ -103,5 +113,5 @@ fn main() -> Result<()> {
 
     // Process frames from a streaming video server, using a SlateDetector to eventually dispatch
     // Actions to an action sink (sender).
-    process_frames(server.into_iter(), slate_detector, running, sender)
+    process_frames(server.into_iter(), &slate_detector, running, sender)
 }
