@@ -106,7 +106,7 @@ pub fn process_frames(
                 FOUND_SLATE_COUNTER.inc();
                 let video_mode = matched_slate
                     .and_then(|s| s.transition.as_ref())
-                    .and_then(|t| Some(&t.to))
+                    .map(|t| &t.to)
                     .unwrap();
                 let tchange = TransitionChange::new(Event::Mode(video_mode.to_owned()));
                 action_sink.send(tchange)?;
