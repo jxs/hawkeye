@@ -4,7 +4,7 @@ use std::borrow::Cow;
 
 /// Helper for bootstrapping Sentry based on HAWKEYE_ENV to capture panics and logs for context.
 pub fn maybe_bootstrap_sentry() -> Option<ClientInitGuard> {
-    if !(*config::SENTRY_ENABLED) {
+    if !*config::SENTRY_ENABLED {
         log::debug!("SENTRY_ENABLED is not true. Skipping Sentry initialization.");
         return None;
     }

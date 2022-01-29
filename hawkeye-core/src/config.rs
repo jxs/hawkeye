@@ -9,10 +9,11 @@ lazy_static! {
     // The environment to base logic decisions off of.
     // ie, if local, don't enable sentry and allow more loose validation
     pub static ref HAWKEYE_ENV: String =
-        std::env::var(HAWKEYE_ENV_ENV).unwrap_or_else(|_| "local".into());
+        std::env::var(HAWKEYE_ENV_ENV).unwrap_or_else(|_| "local".to_owned());
     // Sentry URL to send events to. Available on the Sentry Project page.
-    pub static ref SENTRY_DSN: String = std::env::var(SENTRY_DSN_ENV).unwrap_or_else(|_| "".into());
-    pub static ref SENTRY_ENABLED: bool = std::env::var(SENTRY_ENABLED_ENV).unwrap_or_else(|_| "".into()) == "1";
+    pub static ref SENTRY_DSN: String = std::env::var(SENTRY_DSN_ENV).unwrap_or_else(|_| "".to_owned());
+    #[derive(PartialEq)]
+    pub static ref SENTRY_ENABLED: bool = std::env::var(SENTRY_ENABLED_ENV).unwrap_or_else(|_| "".to_owned()) == "1";
     pub static ref SLATE_URL_FILE_EXTENSIONS: [String; 3] = [
         "jpg".to_string(), "jpeg".to_string(), "png".to_string()
     ];
