@@ -150,8 +150,8 @@ mod test {
         slate
             .read_to_end(&mut buffer)
             .expect("Failed to write to buffer");
-        let slate = Slate::new(buffer.as_slice(), None)?;
-        let detector = SlateDetector::new(vec![slate])?;
+        let slate = Slate::new(buffer.as_slice(), None).unwrap();
+        let detector = SlateDetector::new(vec![slate]).unwrap();
         let slate_img = read_bytes("../resources/slate_fixtures/slate-0-cbsaa-213x120.jpg");
         let matched_slate = detector.matched_slate(slate_img.as_slice());
 
@@ -166,8 +166,8 @@ mod test {
         slate
             .read_to_end(&mut buffer)
             .expect("Failed to write to buffer");
-        let slate = Slate::new(buffer.as_slice(), None)?;
-        let detector = SlateDetector::new(vec![slate])?;
+        let slate = Slate::new(buffer.as_slice(), None).unwrap();
+        let detector = SlateDetector::new(vec![slate]).unwrap();
         let frame_img = read_bytes("../resources/slate_fixtures/non-slate-213x120.jpg");
         let matched_slate = detector.matched_slate(frame_img.as_slice());
 
