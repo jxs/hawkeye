@@ -159,12 +159,16 @@ pub struct SlateBoundingBox {
 impl SlateBoundingBox {
     // Validate that the coordinates provided are sane.
     pub fn is_valid(&self) -> Result<()> {
-        if self.origin[0] + self.bbox_width > self.image_width
+        if self.origin[0] > self.image_width || self.origin[1] > self.image_height {
+            Err(eyre!("origin is outside of image"))
+        } else if self.origin[0] + self.bbox_width > self.image_width
             || self.origin[1] + self.bbox_height > self.image_height
         {
             Err(eyre!("bounding box is outside of image"))
-        } else if self.origin[0] > self.image_width || self.origin[1] > self.image_height {
-            Err(eyre!("origin is outside of image"))
+        } else if self.bbox_width < 100 || self.bbox_height < 100 {
+            Err(eyre!(
+                "bounding box needs to have a width and height greater than 100"
+            ))
         } else {
             Ok(())
         }
@@ -396,13 +400,57 @@ mod tests {
     fn slate_boundingbox_origin_outside_of_image() {
         let bbox = SlateBoundingBox {
             bbox_width: 100,
-            bbox_height: 100,
-            image_width: 200,
-            image_height: 200,
+            bbox_height: 200,
+            image_width: 300,
+            image_height: 400,
+            origin: [950, 0],
+        };
+        let bbox_valid = bbox.is_valid();
+        assert!(bbox_valid.is_err());
+        assert!(format!("{}", bbox_valid.err().unwrap()).contains("origin is outside"));
+    }
+
+    #[test]
+    fn slate_boundingbox_bbox_outside_of_image() {
+        let bbox = SlateBoundingBox {
+            bbox_width: 301,
+            bbox_height: 200,
+            image_width: 300,
+            image_height: 400,
             origin: [0, 0],
         };
         let bbox_valid = bbox.is_valid();
         assert!(bbox_valid.is_err());
-        assert!(format!("{}", bbox_valid.err().unwrap()).contains("foo"))
+        assert!(format!("{}", bbox_valid.err().unwrap()).contains("bounding box is outside"));
+    }
+
+    #[test]
+    fn slate_boundingbox_bbox_too_small_width() {
+        let bbox = SlateBoundingBox {
+            bbox_width: 50,
+            bbox_height: 200,
+            image_width: 300,
+            image_height: 400,
+            origin: [0, 0],
+        };
+        let bbox_valid = bbox.is_valid();
+        assert!(bbox_valid.is_err());
+        assert!(format!("{}", bbox_valid.err().unwrap())
+            .contains("bounding box needs to have a width and height greater"));
+    }
+
+    #[test]
+    fn slate_boundingbox_bbox_too_small_height() {
+        let bbox = SlateBoundingBox {
+            bbox_width: 100,
+            bbox_height: 50,
+            image_width: 300,
+            image_height: 400,
+            origin: [0, 0],
+        };
+        let bbox_valid = bbox.is_valid();
+        assert!(bbox_valid.is_err());
+        assert!(format!("{}", bbox_valid.err().unwrap())
+            .contains("bounding box needs to have a width and height greater"));
     }
 }
