@@ -110,7 +110,7 @@ impl VideoMode {
         match self {
             VideoMode::Slate { url, bbox } => {
                 let parsed_url = Url::parse(url)?;
-                Path::new(parsed_url.path())
+                let url_result = Path::new(parsed_url.path())
                     .extension()
                     .and_then(OsStr::to_str)
                     .ok_or_else(|| eyre!("Invalid URL"))
@@ -129,7 +129,13 @@ impl VideoMode {
                         } else {
                             Ok(())
                         }
-                    })
+                    });
+
+                // Also, validate bounding box.
+                url_result.and_then(|_| match bbox {
+                    Some(bbox_value) => bbox_value.is_valid(),
+                    None => Ok(()),
+                })
             }
             VideoMode::Content => Ok(()),
         }
@@ -147,7 +153,22 @@ pub struct SlateBoundingBox {
     pub image_height: u32,
 
     // The anchor point within image_width/image_height that bbox_width/bbox_height extend from.
-    pub origin: [u32; 2],
+    pub origin: [u32; 2], // x, y
+}
+
+impl SlateBoundingBox {
+    // Validate that the coordinates provided are sane.
+    pub fn is_valid(&self) -> Result<()> {
+        if self.origin[0] + self.bbox_width > self.image_width
+            || self.origin[1] + self.bbox_height > self.image_height
+        {
+            Err(eyre!("bounding box is outside of image"))
+        } else if self.origin[0] > self.image_width || self.origin[1] > self.image_height {
+            Err(eyre!("origin is outside of image"))
+        } else {
+            Ok(())
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
@@ -256,7 +277,7 @@ mod tests {
             transitions: vec![
                 Transition {
                     from: VideoMode::Content,
-                    to: VideoMode::Slate { url: "file://./resources/slate_fixtures/slate-0-cbsaa-213x120.jpg".to_string() },
+                    to: VideoMode::Slate { url: "file://./resources/slate_fixtures/slate-0-cbsaa-213x120.jpg".to_string(), bbox: None },
                     actions: vec![
                         Action::HttpCall( HttpCall {
                             description: Some("Trigger AdBreak using API".to_string()),
@@ -274,7 +295,7 @@ mod tests {
                     ]
                 },
                 Transition {
-                    from: VideoMode::Slate {url: "file://./resources/slate_fixtures/slate-0-cbsaa-213x120.jpg".to_string()},
+                    from: VideoMode::Slate {url: "file://./resources/slate_fixtures/slate-0-cbsaa-213x120.jpg".to_string(), bbox: None},
                     to: VideoMode::Content,
                     actions: vec ![
                         Action::HttpCall( HttpCall {
@@ -300,6 +321,7 @@ mod tests {
     fn check_videomode_slate_url_validates_url_happy() {
         let video_mode = VideoMode::Slate {
             url: "http://bar.baz/zing.png".to_string(),
+            bbox: None,
         };
         assert!(video_mode.is_valid().is_ok());
     }
@@ -308,6 +330,7 @@ mod tests {
     fn check_videomode_slate_url_invalidates_bad_scheme() {
         let video_mode = VideoMode::Slate {
             url: "uhoh://bar.baz/zing.png".to_string(),
+            bbox: None,
         };
         assert!(video_mode.is_valid().is_err());
         assert!(video_mode
@@ -322,6 +345,7 @@ mod tests {
     fn check_videomode_slate_url_validates_extension_happy() {
         let video_mode = VideoMode::Slate {
             url: "uhoh://bar.baz/zing.uhoh".to_string(),
+            bbox: None,
         };
         assert!(video_mode.is_valid().is_err());
         assert!(video_mode
@@ -366,5 +390,19 @@ mod tests {
             serde_json::from_str(watcher_json.as_str()).unwrap();
 
         assert_eq!(watcher_as_value, fixture);
+    }
+
+    #[test]
+    fn slate_boundingbox_origin_outside_of_image() {
+        let bbox = SlateBoundingBox {
+            bbox_width: 100,
+            bbox_height: 100,
+            image_width: 200,
+            image_height: 200,
+            origin: [0, 0],
+        };
+        let bbox_valid = bbox.is_valid();
+        assert!(bbox_valid.is_err());
+        assert!(format!("{}", bbox_valid.err().unwrap()).contains("foo"))
     }
 }

@@ -239,6 +239,7 @@ mod tests {
                 VideoMode::Content,
                 VideoMode::Slate {
                     url: slate_url_filename.to_owned(),
+                    bbox: None,
                 },
             ),
             Action::FakeAction(fake_action),
@@ -249,6 +250,7 @@ mod tests {
 
         executor.execute(&VideoMode::Slate {
             url: slate_url_filename,
+            bbox: None,
         });
         // Must be called since we had a state transition that matches what we defined in the executor
         assert_eq!(called.load(Ordering::SeqCst), true);
@@ -267,6 +269,7 @@ mod tests {
                 VideoMode::Content,
                 VideoMode::Slate {
                     url: slate_url_filename.to_owned(),
+                    bbox: None,
                 },
             ),
             Action::FakeAction(fake_action),
@@ -274,6 +277,7 @@ mod tests {
         executor.execute(&VideoMode::Content);
         executor.execute(&VideoMode::Slate {
             url: slate_url_filename.to_owned(),
+            bbox: None,
         });
         // Must be called since we had a state transition that matches what we defined in the executor
         assert_eq!(called.load(Ordering::SeqCst), true);
@@ -282,6 +286,7 @@ mod tests {
         executor.execute(&VideoMode::Content);
         executor.execute(&VideoMode::Slate {
             url: slate_url_filename.to_owned(),
+            bbox: None,
         });
         assert_eq!(called.load(Ordering::SeqCst), false);
     }
@@ -299,6 +304,7 @@ mod tests {
                 VideoMode::Content,
                 VideoMode::Slate {
                     url: slate_url_filename.to_owned(),
+                    bbox: None,
                 },
             ),
             Action::FakeAction(fake_action),
@@ -306,6 +312,7 @@ mod tests {
         executor.execute(&VideoMode::Content);
         executor.execute(&VideoMode::Slate {
             url: slate_url_filename.to_owned(),
+            bbox: None,
         });
         // Must be called since we had a state transition that matches what we defined in the executor
         assert_eq!(called.load(Ordering::SeqCst), true);
@@ -318,6 +325,7 @@ mod tests {
         executor.execute(&VideoMode::Content);
         executor.execute(&VideoMode::Slate {
             url: slate_url_filename.to_owned(),
+            bbox: None,
         });
         assert_eq!(called.load(Ordering::SeqCst), true);
     }
@@ -335,6 +343,7 @@ mod tests {
                 VideoMode::Content,
                 VideoMode::Slate {
                     url: slate_url_filename.to_owned(),
+                    bbox: None,
                 },
             ),
             Action::FakeAction(fake_action),
@@ -342,6 +351,7 @@ mod tests {
         executor.execute(&VideoMode::Content);
         executor.execute(&VideoMode::Slate {
             url: slate_url_filename.to_owned(),
+            bbox: None,
         });
         // Must be called since we had a state transition that matches what we defined in the executor
         assert_eq!(called.load(Ordering::SeqCst), true);
@@ -353,6 +363,7 @@ mod tests {
 
         executor.execute(&VideoMode::Slate {
             url: slate_url_filename.to_owned(),
+            bbox: None,
         });
         assert_eq!(called.load(Ordering::SeqCst), false);
     }
@@ -370,6 +381,7 @@ mod tests {
                 VideoMode::Content,
                 VideoMode::Slate {
                     url: slate_url_filename.to_owned(),
+                    bbox: None,
                 },
             ),
             Action::FakeAction(fake_action),
@@ -383,6 +395,7 @@ mod tests {
         s.send(TransitionChange {
             event: Event::Mode(VideoMode::Slate {
                 url: slate_url_filename.to_owned(),
+                bbox: None,
             }),
         })
         .unwrap();
@@ -439,6 +452,7 @@ mod tests {
             from: models::VideoMode::Content,
             to: models::VideoMode::Slate {
                 url: "http://foo.bar/baz.png".to_owned(),
+                bbox: None,
             },
             actions: vec![models::Action::HttpCall(HttpCall {
                 description: Some("Trigger AdBreak using API".to_string()),
