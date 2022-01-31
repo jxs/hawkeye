@@ -1,9 +1,11 @@
 use color_eyre::Result;
 use dssim::{DssimImage, ToRGBAPLU, RGBAPLU};
-use hawkeye_core::models::Transition;
+use hawkeye_core::models::{Transition, VideoMode};
 use imgref::{Img, ImgVec};
 use itertools::Itertools;
 use load_image::{Image, ImageData};
+
+const BLACK_SLATE: &str = "black_slate";
 
 pub struct Slate {
     slate: DssimImage<f32>,
@@ -72,25 +74,19 @@ impl SlateDetector {
                 let (is_match, match_score) = slate.is_match(&frame);
                 match is_match {
                     true => {
-                        let slate_url = slate
-                            .transition
-                            .as_ref()
-                            .and_then(|t| t.from_context.as_ref())
-                            .and_then(|fc| fc.slate_context.as_ref())
-                            .map(|sc| sc.slate_url.as_str())
-                            .unwrap_or_else(|| {
-                                // The slate_url wasn't found in the "from" context, so try to "to"
-                                // context.
-                                slate
-                                    .transition
-                                    .as_ref()
-                                    .and_then(|t| t.to_context.as_ref())
-                                    .and_then(|tc| tc.slate_context.as_ref())
-                                    .map(|sc| sc.slate_url.as_str())
-                                    .unwrap_or("black_slate")
-                            });
+                        let slate_url = slate.transition.as_ref().map_or_else(
+                            || BLACK_SLATE,
+                            |transition| match &transition.from {
+                                VideoMode::Slate { url } => url,
+                                _ => match &transition.to {
+                                    VideoMode::Slate { url } => url,
+                                    _ => "unknown slate?",
+                                },
+                            },
+                        );
+
                         log::debug!(
-                            "is_match matched a slate: score={} url={}",
+                            "is_match matched a slate: score={} url={:?}",
                             match_score,
                             slate_url,
                         );
@@ -173,7 +169,6 @@ mod test {
         let slate = Slate::new(buffer.as_slice(), None).unwrap();
         let detector = SlateDetector::new(vec![slate]).unwrap();
         let frame_img = read_bytes("../resources/slate_fixtures/non-slate-213x120.jpg");
-
         let matched_slate = detector.matched_slate(frame_img.as_slice());
 
         assert!(matched_slate.is_none())

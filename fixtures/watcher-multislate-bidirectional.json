@@ -12,11 +12,13 @@
   },
   "transitions": [
     {
-      "from": "content",
-      "to": "slate",
-      "to_context": {
+      "from": {
+        "frame_type": "content"
+      },
+      "to": {
+        "frame_type":  "slate",
         "slate_context": {
-          "slate_url": "file://./resources/slate_fixtures/slate-0-cbsaa-213x120.jpg"
+          "url": "file://./resources/slate_fixtures/slate-0-cbsaa-213x120.jpg"
         }
       },
       "actions": [
@@ -41,11 +43,13 @@
       ]
     },
     {
-      "from": "content",
-      "to": "slate",
-      "to_context": {
+      "from": {
+        "frame_type": "content"
+      },
+      "to": {
+        "frame_type":  "slate",
         "slate_context": {
-          "slate_url": "file://./resources/slate_fixtures/slate-1-portland-213x120.jpg"
+          "url": "file://./resources/slate_fixtures/slate-1-portland-213x120.jpg"
         }
       },
       "actions": [
@@ -64,11 +68,13 @@
       ]
     },
     {
-      "from": "content",
-      "to": "slate",
-      "to_context": {
+      "from": {
+        "frame_type": "content"
+      },
+      "to": {
+        "frame_type":  "slate",
         "slate_context": {
-          "slate_url": "file://./resources/slate_fixtures/slate-2-grandcanyon-213x120.jpg"
+          "url": "file://./resources/slate_fixtures/slate-2-grandcanyon-213x120.jpg"
         }
       },
       "actions": [
@@ -84,11 +90,13 @@
       ]
     },
     {
-      "from": "content",
-      "to": "slate",
-      "to_context": {
+      "from": {
+        "frame_type": "content"
+      },
+      "to": {
+        "frame_type":  "slate",
         "slate_context": {
-          "slate_url": "file://./resources/slate_fixtures/slate-3-rust-213x120.jpg"
+          "url": "file://./resources/slate_fixtures/slate-3-rust-213x120.jpg"
         }
       },
       "actions": [
@@ -101,11 +109,13 @@
       ]
     },
     {
-      "from": "content",
-      "to": "slate",
-      "to_context": {
+      "from": {
+        "frame_type": "content"
+      },
+      "to": {
+        "frame_type":  "slate",
         "slate_context": {
-          "slate_url": "file://./resources/slate_fixtures/slate-4-gogopher-213x120.jpg"
+          "url": "file://./resources/slate_fixtures/slate-4-gogopher-213x120.jpg"
         }
       },
       "actions": [
@@ -118,11 +128,13 @@
       ]
     },
     {
-      "from": "content",
-      "to": "slate",
-      "to_context": {
+      "from": {
+        "frame_type": "content"
+      },
+      "to": {
+        "frame_type":  "slate",
         "slate_context": {
-          "slate_url": "file://./resources/slate_fixtures/slate-5-gstreamer-213x120.jpg"
+          "url": "file://./resources/slate_fixtures/slate-5-gstreamer-213x120.jpg"
         }
       },
       "actions": [
@@ -135,11 +147,13 @@
       ]
     },
     {
-      "from": "content",
-      "to": "slate",
-      "to_context": {
+      "from": {
+        "frame_type": "content"
+      },
+      "to": {
+        "frame_type":  "slate",
         "slate_context": {
-          "slate_url": "file://./resources/slate_fixtures/slate-6-cbsviacom-213x120.jpg"
+          "url": "file://./resources/slate_fixtures/slate-6-cbsviacom-213x120.jpg"
         }
       },
       "actions": [
@@ -152,11 +166,13 @@
       ]
     },
     {
-      "from": "content",
-      "to": "slate",
-      "to_context": {
+      "from": {
+        "frame_type": "content"
+      },
+      "to": {
+        "frame_type":  "slate",
         "slate_context": {
-          "slate_url": "file://./resources/slate_fixtures/slate-7-213x120.png"
+          "url": "file://./resources/slate_fixtures/slate-7-213x120.png"
         }
       },
       "actions": [
@@ -169,11 +185,13 @@
       ]
     },
     {
-      "from": "content",
-      "to": "slate",
-      "to_context": {
+      "from": {
+        "frame_type": "content"
+      },
+      "to": {
+        "frame_type":  "slate",
         "slate_context": {
-          "slate_url": "file://./resources/slate_fixtures/slate-8-213x120.png"
+          "url": "file://./resources/slate_fixtures/slate-8-213x120.png"
         }
       },
       "actions": [
@@ -186,13 +204,15 @@
       ]
     },
     {
-      "from": "slate",
-      "from_context": {
+      "from": {
+        "frame_type": "slate",
         "slate_context": {
-          "slate_url": "file://./resources/slate_fixtures/slate-0-cbsaa-213x120.jpg"
+          "url": "file://./resources/slate_fixtures/slate-0-cbsaa-213x120.jpg"
         }
       },
-      "to": "content",
+      "to": {
+        "frame_type": "content"
+      },
       "actions": [
         {
           "description": "Trigger AdBreak using API",
@@ -215,10 +235,10 @@
       ]
     },
     {
-      "from": "slate",
-      "from_context": {
+      "from": {
+        "frame_type": "slate",
         "slate_context": {
-          "slate_url": "file://./resources/slate_fixtures/slate-1-portland-213x120.jpg"
+          "url": "file://./resources/slate_fixtures/slate-1-portland-213x120.jpg"
         }
       },
       "to": "content",
@@ -238,13 +258,15 @@
       ]
     },
     {
-      "from": "slate",
-      "from_context": {
+      "from": {
+        "frame_type": "slate",
         "slate_context": {
-          "slate_url": "file://./resources/slate_fixtures/slate-2-grandcanyon-213x120.jpg"
+          "url": "file://./resources/slate_fixtures/slate-2-grandcanyon-213x120.jpg"
         }
       },
-      "to": "content",
+      "to": {
+        "frame_type": "content"
+      },
       "actions": [
         {
           "description": "Trigger AdBreak using API",
@@ -258,13 +280,15 @@
       ]
     },
     {
-      "from": "slate",
-      "from_context": {
+      "from": {
+        "frame_type": "slate",
         "slate_context": {
-          "slate_url": "file://./resources/slate_fixtures/slate-3-rust-213x120.jpg"
+          "url": "file://./resources/slate_fixtures/slate-3-rust-213x120.jpg"
         }
       },
-      "to": "content",
+      "to": {
+        "frame_type": "content"
+      },
       "actions": [
         {
           "description": "Trigger AdBreak using API",
@@ -275,13 +299,15 @@
       ]
     },
     {
-      "from": "slate",
-      "from_context": {
+      "from": {
+        "frame_type": "slate",
         "slate_context": {
-          "slate_url": "file://./resources/slate_fixtures/slate-4-gogopher-213x120.jpg"
+          "url": "file://./resources/slate_fixtures/slate-4-gogopher-213x120.jpg"
         }
       },
-      "to": "content",
+      "to": {
+        "frame_type": "content"
+      },
       "actions": [
         {
           "description": "Trigger AdBreak using API",
@@ -292,13 +318,15 @@
       ]
     },
     {
-      "from": "slate",
-      "from_context": {
+      "from": {
+        "frame_type": "slate",
         "slate_context": {
-          "slate_url": "file://./resources/slate_fixtures/slate-5-gstreamer-213x120.jpg"
+          "url": "file://./resources/slate_fixtures/slate-5-gstreamer-213x120.jpg"
         }
       },
-      "to": "content",
+      "to": {
+        "frame_type": "content"
+      },
       "actions": [
         {
           "description": "Trigger AdBreak using API",
@@ -309,13 +337,15 @@
       ]
     },
     {
-      "from": "slate",
-      "from_context": {
+      "from": {
+        "frame_type": "slate",
         "slate_context": {
-          "slate_url": "file://./resources/slate_fixtures/slate-6-cbsviacom-213x120.jpg"
+          "url": "file://./resources/slate_fixtures/slate-6-cbsviacom-213x120.jpg"
         }
       },
-      "to": "content",
+      "to": {
+        "frame_type": "content"
+      },
       "actions": [
         {
           "description": "Trigger AdBreak using API",
@@ -326,13 +356,15 @@
       ]
     },
     {
-      "from": "slate",
-      "from_context": {
+      "from": {
+        "frame_type": "slate",
         "slate_context": {
-          "slate_url": "file://./resources/slate_fixtures/slate-7-213x120.png"
+          "url": "file://./resources/slate_fixtures/slate-7-213x120.png"
         }
       },
-      "to": "content",
+      "to": {
+        "frame_type": "content"
+      },
       "actions": [
         {
           "description": "Trigger AdBreak using API",
@@ -343,13 +375,15 @@
       ]
     },
     {
-      "from": "slate",
-      "from_context": {
+      "from": {
+        "frame_type": "slate",
         "slate_context": {
-          "slate_url": "file://./resources/slate_fixtures/slate-8-213x120.png"
+          "url": "file://./resources/slate_fixtures/slate-8-213x120.png"
         }
       },
-      "to": "content",
+      "to": {
+        "frame_type": "content"
+      },
       "actions": [
         {
           "description": "Trigger AdBreak using API",

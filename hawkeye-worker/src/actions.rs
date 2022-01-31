@@ -5,7 +5,7 @@ use crate::metrics::{
 use crate::video_stream::{Event, TransitionChange};
 use color_eyre::Result;
 use crossbeam::channel::Receiver;
-use hawkeye_core::models::{self, Action, HttpAuth, HttpCall, SlateContext, VideoMode};
+use hawkeye_core::models::{self, Action, HttpAuth, HttpCall, VideoMode};
 use log::{debug, error, info, warn};
 use std::time::Duration;
 
@@ -30,12 +30,7 @@ impl ActionExecution for Action {
 
 /// Represents a sequence of video modes.
 #[derive(Clone, Eq, PartialEq)]
-pub struct TransitionStateChange(
-    VideoMode,
-    Option<SlateContext>,
-    VideoMode,
-    Option<SlateContext>,
-);
+pub struct TransitionStateChange(VideoMode, VideoMode);
 
 /// Manages the execution of an `Action` based on a flow of `VideoMode`s.
 ///
@@ -44,7 +39,6 @@ pub struct ActionExecutor {
     transition_change: TransitionStateChange,
     action: Action,
     last_mode: Option<VideoMode>,
-    last_slate_context: Option<SlateContext>,
     last_call: Option<Instant>,
 }
 
@@ -55,14 +49,13 @@ impl ActionExecutor {
             transition_change,
             action,
             last_mode: None,
-            last_slate_context: None,
             last_call: None,
         }
     }
 
     // Manage the execution of an action based on the provided video mode.
-    pub fn execute(&mut self, mode: VideoMode, slate_context: Option<SlateContext>) {
-        if let Some(result) = self.call_action(mode, &slate_context) {
+    pub fn execute(&mut self, mode: &VideoMode) {
+        if let Some(result) = self.call_action(mode) {
             match result {
                 Ok(_) => self.last_call = Some(Instant::now()),
                 Err(err) => error!(
@@ -71,24 +64,14 @@ impl ActionExecutor {
                 ),
             }
         }
-        self.last_mode = Some(mode);
-        self.last_slate_context = slate_context.clone();
+        self.last_mode = Some(mode.clone());
     }
 
     /// Executes the action if the video mode matches the transition and if the action is
     /// allowed to run.
-    fn call_action(
-        &mut self,
-        mode: VideoMode,
-        slate_context: &Option<SlateContext>,
-    ) -> Option<Result<()>> {
-        self.last_mode.and_then(|last_mode| {
-            if TransitionStateChange(
-                last_mode,
-                self.last_slate_context.clone(),
-                mode,
-                slate_context.clone(),
-            ) == self.transition_change
+    fn call_action(&mut self, mode: &VideoMode) -> Option<Result<()>> {
+        self.last_mode.clone().and_then(|last_mode| {
+            if TransitionStateChange(last_mode, mode.clone()) == self.transition_change
                 && self.allowed_to_run()
             {
                 Some(self.action.execute())
@@ -117,14 +100,7 @@ pub(crate) struct Executors(pub(crate) Vec<ActionExecutor>);
 /// Convert a Transition to a Vec<ActionExecutors>
 impl From<models::Transition> for Executors {
     fn from(transition: models::Transition) -> Self {
-        let from_slate_context = transition.from_context.and_then(|fc| fc.slate_context);
-        let to_slate_context = transition.to_context.and_then(|tc| tc.slate_context);
-        let target_transition = TransitionStateChange(
-            transition.from,
-            from_slate_context,
-            transition.to,
-            to_slate_context,
-        );
+        let target_transition = TransitionStateChange(transition.from, transition.to);
         Self(
             transition
                 .actions
@@ -155,7 +131,7 @@ impl Runtime {
                 Event::Terminate => break,
                 Event::Mode(mode) => {
                     for p in self.actions.iter_mut() {
-                        p.execute(mode, msg.slate_context.clone());
+                        p.execute(&mode);
                     }
                 }
             }
@@ -239,7 +215,7 @@ fn try_call(call: &HttpCall) -> Result<()> {
 mod tests {
     use super::*;
     use crossbeam::channel::unbounded;
-    use hawkeye_core::models::{FakeAction, HttpMethod, ToContext};
+    use hawkeye_core::models::{FakeAction, HttpMethod};
     use mockito::{mock, server_url, Matcher};
     use sn_fake_clock::FakeClock;
     use std::collections::HashMap;
@@ -250,12 +226,6 @@ mod tests {
         FakeClock::advance_time(d.as_millis() as u64);
     }
 
-    fn get_slate_context(filename: &str) -> SlateContext {
-        SlateContext {
-            slate_url: format!("http://foo.bar.local/{}.jpg", filename),
-        }
-    }
-
     #[test]
     fn executor_slate_action_called_when_transition_content_to_slate() {
         let called = Arc::new(AtomicBool::new(false));
@@ -263,24 +233,23 @@ mod tests {
             called: called.clone(),
             execute_returns: Some(Ok(())),
         };
-        let slate_url_filename = "foobar";
+        let slate_url_filename = "foobar".to_string();
         let mut executor = ActionExecutor::new(
             TransitionStateChange(
                 VideoMode::Content,
-                None,
-                VideoMode::Slate,
-                Some(get_slate_context(slate_url_filename)),
+                VideoMode::Slate {
+                    url: slate_url_filename.to_owned(),
+                },
             ),
             Action::FakeAction(fake_action),
         );
-        executor.execute(VideoMode::Content, None);
+        executor.execute(&VideoMode::Content);
         // Didn't call since it was the first state found
         assert_eq!(called.load(Ordering::SeqCst), false);
 
-        executor.execute(
-            VideoMode::Slate,
-            Some(get_slate_context(slate_url_filename)),
-        );
+        executor.execute(&VideoMode::Slate {
+            url: slate_url_filename,
+        });
         // Must be called since we had a state transition that matches what we defined in the executor
         assert_eq!(called.load(Ordering::SeqCst), true);
     }
@@ -296,26 +265,24 @@ mod tests {
         let mut executor = ActionExecutor::new(
             TransitionStateChange(
                 VideoMode::Content,
-                None,
-                VideoMode::Slate,
-                Some(get_slate_context(slate_url_filename)),
+                VideoMode::Slate {
+                    url: slate_url_filename.to_owned(),
+                },
             ),
             Action::FakeAction(fake_action),
         );
-        executor.execute(VideoMode::Content, None);
-        executor.execute(
-            VideoMode::Slate,
-            Some(get_slate_context(slate_url_filename)),
-        );
+        executor.execute(&VideoMode::Content);
+        executor.execute(&VideoMode::Slate {
+            url: slate_url_filename.to_owned(),
+        });
         // Must be called since we had a state transition that matches what we defined in the executor
         assert_eq!(called.load(Ordering::SeqCst), true);
         // Reset state of our mock to "not called"
         called.store(false, Ordering::SeqCst);
-        executor.execute(VideoMode::Content, None);
-        executor.execute(
-            VideoMode::Slate,
-            Some(get_slate_context(slate_url_filename)),
-        );
+        executor.execute(&VideoMode::Content);
+        executor.execute(&VideoMode::Slate {
+            url: slate_url_filename.to_owned(),
+        });
         assert_eq!(called.load(Ordering::SeqCst), false);
     }
 
@@ -330,17 +297,16 @@ mod tests {
         let mut executor = ActionExecutor::new(
             TransitionStateChange(
                 VideoMode::Content,
-                None,
-                VideoMode::Slate,
-                Some(get_slate_context(slate_url_filename)),
+                VideoMode::Slate {
+                    url: slate_url_filename.to_owned(),
+                },
             ),
             Action::FakeAction(fake_action),
         );
-        executor.execute(VideoMode::Content, None);
-        executor.execute(
-            VideoMode::Slate,
-            Some(get_slate_context(slate_url_filename)),
-        );
+        executor.execute(&VideoMode::Content);
+        executor.execute(&VideoMode::Slate {
+            url: slate_url_filename.to_owned(),
+        });
         // Must be called since we had a state transition that matches what we defined in the executor
         assert_eq!(called.load(Ordering::SeqCst), true);
         // Reset state of our mock to "not called"
@@ -349,11 +315,10 @@ mod tests {
         // Move time forward over the delay
         sleep(Duration::from_secs(11));
 
-        executor.execute(VideoMode::Content, None);
-        executor.execute(
-            VideoMode::Slate,
-            Some(get_slate_context(slate_url_filename)),
-        );
+        executor.execute(&VideoMode::Content);
+        executor.execute(&VideoMode::Slate {
+            url: slate_url_filename.to_owned(),
+        });
         assert_eq!(called.load(Ordering::SeqCst), true);
     }
 
@@ -368,17 +333,16 @@ mod tests {
         let mut executor = ActionExecutor::new(
             TransitionStateChange(
                 VideoMode::Content,
-                None,
-                VideoMode::Slate,
-                Some(get_slate_context(slate_url_filename)),
+                VideoMode::Slate {
+                    url: slate_url_filename.to_owned(),
+                },
             ),
             Action::FakeAction(fake_action),
         );
-        executor.execute(VideoMode::Content, None);
-        executor.execute(
-            VideoMode::Slate,
-            Some(get_slate_context(slate_url_filename)),
-        );
+        executor.execute(&VideoMode::Content);
+        executor.execute(&VideoMode::Slate {
+            url: slate_url_filename.to_owned(),
+        });
         // Must be called since we had a state transition that matches what we defined in the executor
         assert_eq!(called.load(Ordering::SeqCst), true);
         // Reset state of our mock to "not called"
@@ -387,10 +351,9 @@ mod tests {
         // Move time forward over the delay
         sleep(Duration::from_secs(20));
 
-        executor.execute(
-            VideoMode::Slate,
-            Some(get_slate_context(slate_url_filename)),
-        );
+        executor.execute(&VideoMode::Slate {
+            url: slate_url_filename.to_owned(),
+        });
         assert_eq!(called.load(Ordering::SeqCst), false);
     }
 
@@ -405,26 +368,26 @@ mod tests {
         let mut executor = ActionExecutor::new(
             TransitionStateChange(
                 VideoMode::Content,
-                None,
-                VideoMode::Slate,
-                Some(get_slate_context(slate_url_filename)),
+                VideoMode::Slate {
+                    url: slate_url_filename.to_owned(),
+                },
             ),
             Action::FakeAction(fake_action),
         );
         // Prepare executor to be ready in the next call with `VideoMode::Slate`
-        executor.execute(VideoMode::Content, None);
+        executor.execute(&VideoMode::Content);
         assert_eq!(called.load(Ordering::SeqCst), false);
 
         let (s, r) = unbounded();
         // Pile up some events for the runtime to consume
         s.send(TransitionChange {
-            event: Event::Mode(VideoMode::Slate),
-            slate_context: Some(get_slate_context(slate_url_filename)),
+            event: Event::Mode(VideoMode::Slate {
+                url: slate_url_filename.to_owned(),
+            }),
         })
         .unwrap();
         s.send(TransitionChange {
             event: Event::Terminate,
-            slate_context: None,
         })
         .unwrap();
 
@@ -474,13 +437,9 @@ mod tests {
     fn build_executor_from_models() {
         let transition = models::Transition {
             from: models::VideoMode::Content,
-            from_context: None,
-            to: models::VideoMode::Slate,
-            to_context: Some(ToContext {
-                slate_context: Some(SlateContext {
-                    slate_url: "http://foo.bar/baz.png".to_string(),
-                }),
-            }),
+            to: models::VideoMode::Slate {
+                url: "http://foo.bar/baz.png".to_owned(),
+            },
             actions: vec![models::Action::HttpCall(HttpCall {
                 description: Some("Trigger AdBreak using API".to_string()),
                 method: HttpMethod::POST,
