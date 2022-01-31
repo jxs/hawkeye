@@ -132,7 +132,6 @@ pub fn process_frames(
     }
 
     info!("Stopping pipeline gracefully!");
-    // action_sink.send(Event::Terminate)?;
     let tc = TransitionChange::new(Event::Terminate);
     action_sink.send(tc)?;
 
