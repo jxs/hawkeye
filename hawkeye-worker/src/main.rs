@@ -57,7 +57,7 @@ fn main() -> Result<()> {
         .transitions
         .iter()
         .filter_map(|transition| match &transition.to {
-            VideoMode::Slate { url } => {
+            VideoMode::Slate { url, .. } => {
                 let slate = Slate::new(
                     &slate::load_img(url.as_str()).unwrap(),
                     Some(transition.to_owned()),

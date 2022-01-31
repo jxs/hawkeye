@@ -139,15 +139,15 @@ impl VideoMode {
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
 pub struct SlateBoundingBox {
     // The bounding box within image_width/image_height.
-    pub bbox_width: i32,
-    pub bbox_height: i32,
+    pub bbox_width: u32,
+    pub bbox_height: u32,
 
     // Total image widths so we can take a proportion to scale other images for comparison.
-    pub image_width: i32,
-    pub image_height: i32,
+    pub image_width: u32,
+    pub image_height: u32,
 
     // The anchor point within image_width/image_height that bbox_width/bbox_height extend from.
-    pub origin: [int; 2],
+    pub origin: [u32; 2],
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]

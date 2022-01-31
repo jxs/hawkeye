@@ -77,9 +77,9 @@ impl SlateDetector {
                         let slate_url = slate.transition.as_ref().map_or_else(
                             || BLACK_SLATE,
                             |transition| match &transition.from {
-                                VideoMode::Slate { url } => url,
+                                VideoMode::Slate { url, .. } => url,
                                 _ => match &transition.to {
-                                    VideoMode::Slate { url } => url,
+                                    VideoMode::Slate { url, .. } => url,
                                     _ => "unknown slate?",
                                 },
                             },
