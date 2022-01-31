@@ -45,8 +45,6 @@ header `Authorization: Bearer {token}`.
 
 ## Running locally
 
-> Data is persisted via Kubernetes metadata. For example, IDs of created objects may be represented in a Kubernetes resource's `metadata` key/value pairs. This value can later be filtered on when we are looking for specific resources or a "list view" can easily be built much like doing a `select * from some_kinda_resource` in a RDMS. The Hawkeye API couriers data between JSON and and Kubernetes resources using this pattern.
-
 There are multiple ways to run these components locally.
 
 - Run a local API to accept `POST /v1/watchers` payloads. This request will also spawn
@@ -139,12 +137,13 @@ and do a `POST http://localhost:8080/v1/watchers` with something like:
   },
   "transitions": [
     {
-      "from": "content",
-      "from_context": null,
-      "to": "slate",
-      "to_context": {
+      "from": {
+        "frame_type": "content",
+      },
+      "to": {
+        "frame_type": "slate",
         "slate_context": {
-          "slate_url": "file://./resources/slate_fixtures/slate-0-cbsaa-213x120.jpg"
+          "url": "file://./resources/slate_fixtures/slate-0-cbsaa-213x120.jpg"
         }
       },
       "actions": [
@@ -169,14 +168,15 @@ and do a `POST http://localhost:8080/v1/watchers` with something like:
       ]
     },
     {
-      "from": "slate",
-      "from_context": {
+      "from": {
+        "frame_type": "slate",
         "slate_context": {
-          "slate_url": "file://./resources/slate_fixtures/slate-0-cbsaa-213x120.jpg"
+          "url": "file://./resources/slate_fixtures/slate-0-cbsaa-213x120.jpg"
         }
       },
-      "to": "content",
-      "to_context": null,
+      "to": {
+        "frame_type": "content",
+      },
       "actions": [
         {
           "description": "Use dump out of AdBreak API call",
