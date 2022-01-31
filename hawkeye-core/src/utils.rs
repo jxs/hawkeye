@@ -42,23 +42,20 @@ mod tests {
     use std::env;
 
     #[test]
-    fn test_sentry_not_enabled_prevents_sentry_bootstrap() {
+    fn test_sentry_bootstrapping() {
+        // not enabled
         env::set_var("HAWKEYE_SENTRY_DSN", "https://abc123");
         env::set_var("HAWKEYE_SENTRY_ENABLED", "0");
         let sentry = utils::maybe_bootstrap_sentry();
         assert!(sentry.is_none());
-    }
 
-    #[test]
-    fn test_sentry_enabled_but_no_dsn_prevents_sentry_bootstrap() {
+        // missing DSN
         env::remove_var("HAWKEYE_SENTRY_DSN");
         env::set_var("HAWKEYE_SENTRY_ENABLED", "1");
         let sentry = utils::maybe_bootstrap_sentry();
         assert!(sentry.is_none());
-    }
 
-    #[test]
-    fn test_sentry_enabled_but_invalid_dsn_prevents_sentry_bootstrap() {
+        // invalid DSN
         env::set_var("HAWKEYE_SENTRY_DSN", "oops");
         env::set_var("HAWKEYE_SENTRY_ENABLED", "1");
         let sentry = utils::maybe_bootstrap_sentry();
