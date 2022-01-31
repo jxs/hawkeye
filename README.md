@@ -45,8 +45,7 @@ header `Authorization: Bearer {token}`.
 
 ## Running locally
 
-> Data is persisted via utilizing Kubernetes metadata to store and retrieve relational
-> data.
+> Data is persisted via Kubernetes metadata. For example, IDs of created objects may be represented in a Kubernetes resource's `metadata` key/value pairs. This value can later be filtered on when we are looking for specific resources or a "list view" can easily be built much like doing a `select * from some_kinda_resource` in a RDMS. The Hawkeye API couriers data between JSON and and Kubernetes resources using this pattern.
 
 There are multiple ways to run these components locally.
 
