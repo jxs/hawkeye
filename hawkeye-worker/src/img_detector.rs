@@ -1,9 +1,11 @@
+use crate::slate::load_img;
 use color_eyre::Result;
 use dssim::{DssimImage, ToRGBAPLU, RGBAPLU};
 use hawkeye_core::models::{Transition, VideoMode};
 use imgref::{Img, ImgVec};
 use itertools::Itertools;
 use load_image::{Image, ImageData};
+use std::borrow::BorrowMut;
 
 const BLACK_SLATE: &str = "black_slate";
 
@@ -18,13 +20,30 @@ impl Slate {
     /// Create a new Slate using the image bytes and the selected similarity algorithm.
     /// Note: similarity_algorithm can only be `dssim::Dssim` at the moment, so this is
     /// essentially hardcoded in type and value.
-    pub fn new(slate_data: &[u8], transition: Option<Transition>) -> Result<Self> {
-        let slate_img = load_data(slate_data)?;
-
+    pub fn new(slate_url: &str, transition: Option<Transition>) -> Result<Self> {
         // There's only one algo at the moment, so hardcode it instead of making it an
         // argument.
         let similarity_algorithm = dssim::Dssim::new();
-        let slate = similarity_algorithm.create_image(&slate_img).unwrap();
+        let slate_vec = load_img(slate_url)?;
+        let mut slate_img = load_data(slate_vec.as_slice())?;
+        // Attempt to create a sub image if a bbox was supplied for a SlateContext.
+        let slate = transition
+            .as_ref()
+            .and_then(|transition| match &transition.to {
+                VideoMode::Slate { bbox, .. } => bbox.as_ref().map(|bb| {
+                    let sub_image = slate_img.borrow_mut().sub_image(
+                        bb.origin[0] as usize,
+                        bb.origin[1] as usize,
+                        bb.bbox_width as usize,
+                        bb.bbox_height as usize,
+                    );
+                    log::warn!("creating image from sub image...");
+                    similarity_algorithm.create_image(&sub_image).unwrap()
+                }),
+                _ => None,
+            })
+            .or_else(|| similarity_algorithm.create_image(&slate_img))
+            .unwrap();
 
         Ok(Self {
             slate,
@@ -130,7 +149,6 @@ fn match_img_bitmap(img: Image) -> ImgVec<RGBAPLU> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use std::fs::File;
     use std::io::Read;
     use std::path::Path;
 
@@ -144,13 +162,11 @@ mod test {
 
     #[test]
     fn compare_equal_images() {
-        let mut slate = File::open("../resources/slate_fixtures/slate-0-cbsaa-213x120.jpg")
-            .expect("Missing file in resources folder");
-        let mut buffer = Vec::new();
-        slate
-            .read_to_end(&mut buffer)
-            .expect("Failed to write to buffer");
-        let slate = Slate::new(buffer.as_slice(), None).unwrap();
+        let slate = Slate::new(
+            "../resources/slate_fixtures/slate-0-cbsaa-213x120.jpg",
+            None,
+        )
+        .unwrap();
         let detector = SlateDetector::new(vec![slate]).unwrap();
         let slate_img = read_bytes("../resources/slate_fixtures/slate-0-cbsaa-213x120.jpg");
         let matched_slate = detector.matched_slate(slate_img.as_slice());
@@ -160,13 +176,11 @@ mod test {
 
     #[test]
     fn compare_diff_images() {
-        let mut slate = File::open("../resources/slate_fixtures/slate-0-cbsaa-213x120.jpg")
-            .expect("Missing file in resources folder");
-        let mut buffer = Vec::new();
-        slate
-            .read_to_end(&mut buffer)
-            .expect("Failed to write to buffer");
-        let slate = Slate::new(buffer.as_slice(), None).unwrap();
+        let slate = Slate::new(
+            "../resources/slate_fixtures/slate-0-cbsaa-213x120.jpg",
+            None,
+        )
+        .unwrap();
         let detector = SlateDetector::new(vec![slate]).unwrap();
         let frame_img = read_bytes("../resources/slate_fixtures/non-slate-213x120.jpg");
         let matched_slate = detector.matched_slate(frame_img.as_slice());

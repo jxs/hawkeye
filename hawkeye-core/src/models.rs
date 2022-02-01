@@ -156,8 +156,10 @@ pub struct SlateBoundingBox {
     pub origin: [u32; 2], // x, y
 }
 
+/// Represent a bounding box of coordinates within the original slate image that will correspond to
+/// a sub image of the slate to match against.
 impl SlateBoundingBox {
-    // Validate that the coordinates provided are sane.
+    /// Validate that the coordinates provided are sane.
     pub fn is_valid(&self) -> Result<()> {
         if self.origin[0] > self.image_width || self.origin[1] > self.image_height {
             Err(eyre!("origin is outside of image"))
@@ -173,6 +175,14 @@ impl SlateBoundingBox {
             Ok(())
         }
     }
+
+    // /// Get the scale factor of image w.r.t. the bounding box.
+    // fn scale_factor(&self) -> (u32, u32) {
+    //     (
+    //         self.image_width - self.bbox_width,
+    //         self.image_height - self.bbox_height,
+    //     )
+    // }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]

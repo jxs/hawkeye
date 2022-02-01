@@ -58,11 +58,7 @@ fn main() -> Result<()> {
         .iter()
         .filter_map(|transition| match &transition.to {
             VideoMode::Slate { url, .. } => {
-                let slate = Slate::new(
-                    &slate::load_img(url.as_str()).unwrap(),
-                    Some(transition.to_owned()),
-                )
-                .unwrap();
+                let slate = Slate::new(url.as_str(), Some(transition.to_owned())).unwrap();
 
                 let mut execs: Executors = transition.clone().into();
                 // QUESTION: Do we only support 1 Action?

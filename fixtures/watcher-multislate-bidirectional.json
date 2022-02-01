@@ -241,7 +241,9 @@
           "url": "file://./resources/slate_fixtures/slate-1-portland-213x120.jpg"
         }
       },
-      "to": "content",
+      "to": {
+          "frame_type": "content"
+      },
       "actions": [
         {
           "description": "Trigger AdBreak using API",
