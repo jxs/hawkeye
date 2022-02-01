@@ -85,22 +85,38 @@ impl SlateDetector {
     /// `image_buffer`. If there's more than a single match, the one with lowest score
     /// is taken (the "most" matched).
     pub fn matched_slate(&self, image_buffer: &[u8]) -> Option<&Slate> {
-        let frame_img = load_data(image_buffer).unwrap();
-        let frame = self.similarity_algorithm.create_image(&frame_img).unwrap();
+        let mut frame_img = load_data(image_buffer).unwrap();
+        // let frame = self.similarity_algorithm.create_image(&frame_img).unwrap();
         self.slates
             .iter()
             .filter_map(|slate| {
+                let frame = slate
+                    .transition
+                    .as_ref()
+                    .and_then(|transition| match &transition.to {
+                        VideoMode::Slate { bbox, .. } => bbox.as_ref().map(|bb| {
+                            let sub_image = frame_img.borrow_mut().sub_image(
+                                bb.origin[0] as usize,
+                                bb.origin[1] as usize,
+                                bb.bbox_width as usize,
+                                bb.bbox_height as usize,
+                            );
+                            log::warn!("creating image from sub image...");
+                            self.similarity_algorithm.create_image(&sub_image).unwrap()
+                        }),
+                        _ => None,
+                    })
+                    .or_else(|| self.similarity_algorithm.create_image(&frame_img))
+                    .unwrap();
+
                 let (is_match, match_score) = slate.is_match(&frame);
                 match is_match {
                     true => {
                         let slate_url = slate.transition.as_ref().map_or_else(
                             || BLACK_SLATE,
-                            |transition| match &transition.from {
+                            |transition| match &transition.to {
                                 VideoMode::Slate { url, .. } => url,
-                                _ => match &transition.to {
-                                    VideoMode::Slate { url, .. } => url,
-                                    _ => "unknown slate?",
-                                },
+                                _ => panic!("unknown slate?"),
                             },
                         );
 
