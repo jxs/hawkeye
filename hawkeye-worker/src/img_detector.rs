@@ -86,6 +86,7 @@ impl SlateDetector {
     /// is taken (the "most" matched).
     pub fn matched_slate(&self, image_buffer: &[u8]) -> Option<&Slate> {
         let mut frame_img = load_data(image_buffer).unwrap();
+        // TODO: don't generate the same frame every time when there is no bounding-box.
         // let frame = self.similarity_algorithm.create_image(&frame_img).unwrap();
         self.slates
             .iter()
