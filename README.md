@@ -101,8 +101,7 @@ apt-get install -y --no-install-recommends \
 
 ### Streaming Prepared Video
 
-You can easily stream (RTP, udpsrc) prepared media via `ffmpeg` to a Watcher to test
-functionality and dev changes.
+You can use `ffmpeg` to send a RTP stream to a Watcher using a pre-recorded video file. This is useful to test functionality and to verify changes during development.
 
 > `ffmpeg` is a popular app, so it'll be in whatever package manager you use.
 
