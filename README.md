@@ -13,8 +13,8 @@ video feed.
 
 ### API
 
-The REST API _basically_ exists to manage Workers, but also serves up healthcheck and
-prometheus metrics endpoints.
+The REST API is responsible to manage Workers, serve healthchecks, and
+provide Prometheus metrics.
 
 When you create a Watcher by doing a `POST /v1/watchers`, the API will create some
 Kubernetes artifacts: ConfigMap, Deployment, Service. These items are to support
