@@ -103,7 +103,7 @@ apt-get install -y --no-install-recommends \
 
 You can use `ffmpeg` to send a RTP stream to a Watcher using a pre-recorded video file. This is useful to test functionality and to verify changes during development.
 
-> `ffmpeg` is a popular app, so it'll be in whatever package manager you use.
+> `ffmpeg` is a popular software for multimedia processing, so it should be available in whatever system package manager you use (eg. Homebrew, apt-get, yarn, etc).
 
 The prepared video might be a custom video clip that plays a video clip of your
 choosing, but with the slates that were configured against a Watcher spliced in to the
