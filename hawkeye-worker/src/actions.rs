@@ -93,8 +93,8 @@ impl ActionExecutor {
     }
 }
 
-// TODO: Delete this type
-// TODO: ^^^ why?
+// TODO: Delete this type since it is only making things more complicated in the code.
+// We would be better without it.
 pub(crate) struct Executors(pub(crate) Vec<ActionExecutor>);
 
 /// Convert a Transition to a Vec<ActionExecutors>
