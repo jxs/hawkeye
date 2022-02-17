@@ -51,7 +51,8 @@ pub fn process_frames(
     let black_slate = Slate::new(black_image, None)?;
     let black_detector = SlateDetector::new(vec![black_slate])?;
 
-    // TODO: Comment on why this is needed.
+    // TODO: This is just for debugging and to know if there were results from the
+    // frame_source iterator without any frames.
     let mut empty_iterations = 0;
 
     for frame in frame_source {
