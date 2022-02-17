@@ -12,7 +12,6 @@ lazy_static! {
         std::env::var(HAWKEYE_ENV_ENV).unwrap_or_else(|_| "local".to_owned());
     // Sentry URL to send events to. Available on the Sentry Project page.
     pub static ref SENTRY_DSN: String = std::env::var(SENTRY_DSN_ENV).unwrap_or_else(|_| "".to_owned());
-    #[derive(PartialEq)]
     pub static ref SENTRY_ENABLED: bool = std::env::var(SENTRY_ENABLED_ENV).unwrap_or_else(|_| "".to_owned()) == "1";
     pub static ref SLATE_URL_FILE_EXTENSIONS: [String; 3] = [
         "jpg".to_string(), "jpeg".to_string(), "png".to_string()
