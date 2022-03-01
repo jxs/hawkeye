@@ -1,3 +1,4 @@
+use crate::backend::{WatcherStartStatus, WatcherStopStatus};
 use crate::config::{CALL_WATCHER_TIMEOUT, NAMESPACE};
 use crate::filters::ErrorResponse;
 use crate::templates::{configmap_name, container_spec, deployment_name, service_name};
@@ -16,7 +17,6 @@ use warp::http::header::{CACHE_CONTROL, CONTENT_TYPE};
 use warp::http::{HeaderValue, StatusCode};
 use warp::hyper::Body;
 use warp::reply;
-use crate::backend::{WatcherStartStatus, WatcherStopStatus};
 
 pub async fn list_watchers(client: Client) -> Result<impl warp::Reply, Infallible> {
     let lp = ListParams::default()
@@ -123,7 +123,8 @@ pub async fn update_watcher(
     }
 
     // We use the ConfigMap as source of truth for what are the watchers we have
-    let config_maps_client: Api<ConfigMap> = Api::namespaced(k8s_client.clone(), &config::NAMESPACE);
+    let config_maps_client: Api<ConfigMap> =
+        Api::namespaced(k8s_client.clone(), &config::NAMESPACE);
     let config_map = match config_maps_client
         .get(&templates::configmap_name(&watcher_id))
         .await
@@ -144,11 +145,13 @@ pub async fn update_watcher(
     {
         Ok(d) => d,
         Err(_) => {
-            log::error!("A ConfigMap was found, but the Deployment was missing for Watcher {watcher_id}");
+            log::error!(
+                "A ConfigMap was found, but the Deployment was missing for Watcher {watcher_id}"
+            );
             return Ok(reply::with_status(
                 reply::json(&json!({})),
                 StatusCode::NOT_FOUND,
-            ))
+            ));
         }
     };
 
@@ -186,7 +189,11 @@ pub async fn update_watcher(
     // 1. Update ConfigMap
     log::debug!("Updating ConfigMap instance");
     let config_file_contents = serde_json::to_string(&existing_watcher).unwrap();
-    let config = templates::build_configmap(&watcher_id, &config_file_contents, existing_watcher.tags.as_ref());
+    let config = templates::build_configmap(
+        &watcher_id,
+        &config_file_contents,
+        existing_watcher.tags.as_ref(),
+    );
     // TODO: Handle errors
     let patch_params = PatchParams {
         field_manager: Some("hawkeye_api".to_string()),
@@ -201,7 +208,11 @@ pub async fn update_watcher(
 
     // 2. Update Deployment with replicas=0
     log::debug!("Updating Deployment instance");
-    let deploy = templates::build_deployment(&watcher_id, existing_watcher.source.ingest_port, existing_watcher.tags.as_ref());
+    let deploy = templates::build_deployment(
+        &watcher_id,
+        existing_watcher.source.ingest_port,
+        existing_watcher.tags.as_ref(),
+    );
     // TODO: Handle errors
     let patch_params = PatchParams {
         field_manager: Some("hawkeye_api".to_string()),
@@ -216,7 +227,11 @@ pub async fn update_watcher(
 
     // 3. Update Service/LoadBalancer
     log::debug!("Updating Service instance");
-    let svc = templates::build_service(&watcher_id, existing_watcher.source.ingest_port, existing_watcher.tags.as_ref());
+    let svc = templates::build_service(
+        &watcher_id,
+        existing_watcher.source.ingest_port,
+        existing_watcher.tags.as_ref(),
+    );
     // TODO: Handle errors
     // let _ = services.create(&pp, &svc).await.unwrap();
     let patch_params = PatchParams {
@@ -508,13 +523,24 @@ pub async fn get_video_frame(
 
 /// Start a Watcher worker by making sure there's a positive replica count for the Kubernetes
 /// deployment.
-pub async fn start_watcher(watcher_id: String, k8s_client: kube::Client) -> Result<impl warp::Reply, Infallible> {
+pub async fn start_watcher(
+    watcher_id: String,
+    k8s_client: kube::Client,
+) -> Result<impl warp::Reply, Infallible> {
     let status = backend::start_watcher(&k8s_client, &watcher_id).await;
     let (msg, status_code) = match status {
         WatcherStartStatus::NotFound => ("Watcher can not be found.".to_owned(), StatusCode::OK),
-        WatcherStartStatus::AlreadyRunning => ("Watcher is already running".to_owned(), StatusCode::OK),
-        WatcherStartStatus::CurrentlyUpdating => ("Watcher is currently updating".to_owned(), StatusCode::CONFLICT),
-        WatcherStartStatus::InErrorState => ("Watcher in error state cannot be set to running".to_owned(), StatusCode::NOT_ACCEPTABLE),
+        WatcherStartStatus::AlreadyRunning => {
+            ("Watcher is already running".to_owned(), StatusCode::OK)
+        }
+        WatcherStartStatus::CurrentlyUpdating => (
+            "Watcher is currently updating".to_owned(),
+            StatusCode::CONFLICT,
+        ),
+        WatcherStartStatus::InErrorState => (
+            "Watcher in error state cannot be set to running".to_owned(),
+            StatusCode::NOT_ACCEPTABLE,
+        ),
         _ => {
             // Start Watcher by setting Kubernetes deployment replicas=1
             let patch_params = PatchParams {
@@ -527,7 +553,8 @@ pub async fn start_watcher(watcher_id: String, k8s_client: kube::Client) -> Resu
                 "apiVersion": "autoscaling/v1",
                 "spec": { "replicas": 1 as u16 },
             });
-            let deployments_client: Api<Deployment> = Api::namespaced(k8s_client.clone(), &config::NAMESPACE);
+            let deployments_client: Api<Deployment> =
+                Api::namespaced(k8s_client.clone(), &config::NAMESPACE);
             deployments_client
                 .patch_scale(
                     &templates::deployment_name(&watcher_id),
@@ -560,8 +587,8 @@ pub async fn start_watcher(watcher_id: String, k8s_client: kube::Client) -> Resu
     };
 
     Ok(reply::with_status(
-         reply::json(&json!({"message": msg})),
-         status_code,
+        reply::json(&json!({ "message": msg })),
+        status_code,
     ))
 }
 
@@ -574,9 +601,17 @@ pub async fn stop_watcher(
     let status = backend::stop_watcher(&k8s_client, &watcher_id).await;
     let (msg, status_code) = match status {
         WatcherStopStatus::NotFound => ("Watcher can not be found.".to_owned(), StatusCode::OK),
-        WatcherStopStatus::AlreadyStopped => ("Watcher is already stopped".to_owned(), StatusCode::OK),
-        WatcherStopStatus::CurrentlyUpdating => ("Watcher is currently updating".to_owned(), StatusCode::CONFLICT),
-        WatcherStopStatus::InErrorState => ("Watcher in error state cannot be set to stopped".to_owned(), StatusCode::NOT_ACCEPTABLE),
+        WatcherStopStatus::AlreadyStopped => {
+            ("Watcher is already stopped".to_owned(), StatusCode::OK)
+        }
+        WatcherStopStatus::CurrentlyUpdating => (
+            "Watcher is currently updating".to_owned(),
+            StatusCode::CONFLICT,
+        ),
+        WatcherStopStatus::InErrorState => (
+            "Watcher in error state cannot be set to stopped".to_owned(),
+            StatusCode::NOT_ACCEPTABLE,
+        ),
         _ => {
             // Stop watcher / replicas to 0
             let patch_params = PatchParams {
@@ -584,11 +619,12 @@ pub async fn stop_watcher(
                 ..Default::default()
             };
 
-            let deployment_scale_json :Value = json!({
+            let deployment_scale_json: Value = json!({
                 "apiVersion": "autoscaling/v1",
                 "spec": { "replicas": 0 as i16 },
             });
-            let deployments_client: Api<Deployment> = Api::namespaced(k8s_client.clone(), &config::NAMESPACE);
+            let deployments_client: Api<Deployment> =
+                Api::namespaced(k8s_client.clone(), &config::NAMESPACE);
             deployments_client
                 .patch_scale(
                     &templates::deployment_name(&watcher_id),
@@ -621,8 +657,8 @@ pub async fn stop_watcher(
     };
 
     Ok(reply::with_status(
-         reply::json(&json!({"message": msg})),
-         status_code,
+        reply::json(&json!({ "message": msg })),
+        status_code,
     ))
 }
 

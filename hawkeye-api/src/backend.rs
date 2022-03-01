@@ -1,22 +1,22 @@
-use k8s_openapi::api::apps::v1::Deployment;
-use kube::Api;
-use kube::api::{Patch, PatchParams};
-use serde_json::json;
-use hawkeye_core::models::Status;
 use crate::{config, templates};
+use hawkeye_core::models::Status;
+use k8s_openapi::api::apps::v1::Deployment;
+use kube::api::{Patch, PatchParams};
+use kube::Api;
 use serde::Deserialize;
+use serde_json::json;
 use thiserror::Error;
 
 #[derive(Debug, Deserialize, Error)]
 pub enum WatcherStartStatus {
     #[error("Watcher is already running.")]
-    AlreadyRunning,  // ok
+    AlreadyRunning, // ok
     #[error("Watcher is updating so it cannot be started.")]
-    CurrentlyUpdating,  // conflict
+    CurrentlyUpdating, // conflict
     #[error("Watcher is starting.")]
     Starting, // ok
     #[error("Watcher is in an error state and cannot be stopped.")]
-    InErrorState,  // NOT_ACCEPTABLE
+    InErrorState, // NOT_ACCEPTABLE
     #[error("Watcher not found.")]
     NotFound, // 404
 }
@@ -24,27 +24,26 @@ pub enum WatcherStartStatus {
 #[derive(Debug, Deserialize, Error)]
 pub enum WatcherStopStatus {
     #[error("Watcher is already stopped.")]
-    AlreadyStopped,  // ok
+    AlreadyStopped, // ok
     #[error("Watcher is updating so it cannot be stopped.")]
-    CurrentlyUpdating,  // conflict
+    CurrentlyUpdating, // conflict
     #[error("Watching is stopping.")]
     Stopping, // ok
     #[error("Watcher is in an error state and cannot be stopped.")]
-    InErrorState,  // NOT_ACCEPTABLE
+    InErrorState, // NOT_ACCEPTABLE
     #[error("Watcher not found.")]
     NotFound, // 404
 }
 
 pub async fn start_watcher(k8s_client: &kube::Client, watcher_id: &str) -> WatcherStartStatus {
-    let deployments_client: Api<Deployment> = Api::namespaced(k8s_client.clone(), &config::NAMESPACE);
+    let deployments_client: Api<Deployment> =
+        Api::namespaced(k8s_client.clone(), &config::NAMESPACE);
     let deployment = match deployments_client
         .get(&templates::deployment_name(&watcher_id))
         .await
     {
         Ok(d) => d,
-        Err(_) => {
-            return WatcherStartStatus::NotFound
-        }
+        Err(_) => return WatcherStartStatus::NotFound,
     };
 
     // Actions and guards based on the current Watcher status.
@@ -97,16 +96,15 @@ pub async fn start_watcher(k8s_client: &kube::Client, watcher_id: &str) -> Watch
 }
 
 pub async fn stop_watcher(k8s_client: &kube::Client, watcher_id: &str) -> WatcherStopStatus {
-    let deployments_client: Api<Deployment> = Api::namespaced(k8s_client.clone(), &config::NAMESPACE);
+    let deployments_client: Api<Deployment> =
+        Api::namespaced(k8s_client.clone(), &config::NAMESPACE);
     // TODO: probably better to just get the scale
     let deployment = match deployments_client
         .get(&templates::deployment_name(&watcher_id))
         .await
     {
         Ok(d) => d,
-        Err(_) => {
-            return WatcherStopStatus::NotFound
-        }
+        Err(_) => return WatcherStopStatus::NotFound,
     };
 
     match get_watcher_status(&deployment) {
@@ -156,42 +154,45 @@ pub async fn stop_watcher(k8s_client: &kube::Client, watcher_id: &str) -> Watche
     }
 }
 
-
-fn get_watcher_status(deployment: &Deployment) -> Status{
+fn get_watcher_status(deployment: &Deployment) -> Status {
     let target_status = deployment
-            .metadata
-            .labels
-            .as_ref()
-            .map(|labels| {
-                labels
-                    .get("target_status")
-                    .map(|status| serde_json::from_str(&format!("\"{}\"", status)).ok())
-            })
-            .flatten()
-            .flatten()
-            .unwrap_or({
-                let name = deployment.metadata.name.as_ref().expect("Name must be present");
-                log::error!(
-                    "Deployment {} is missing required 'target_status' label",
-                    name
-                );
-                Status::Error
-            });
-
-        if let Some(status) = deployment.status.as_ref() {
-            let deploy_status = if status.available_replicas.unwrap_or(0) > 0 {
-                Status::Running
-            } else {
-                Status::Ready
-            };
-            match (deploy_status, target_status) {
-                (Status::Running, Status::Running) => Status::Running,
-                (Status::Ready, Status::Ready) => Status::Ready,
-                (Status::Ready, Status::Running) => Status::Pending,
-                (Status::Running, Status::Ready) => Status::Pending,
-                (_, _) => Status::Error,
-            }
-        } else {
+        .metadata
+        .labels
+        .as_ref()
+        .map(|labels| {
+            labels
+                .get("target_status")
+                .map(|status| serde_json::from_str(&format!("\"{}\"", status)).ok())
+        })
+        .flatten()
+        .flatten()
+        .unwrap_or({
+            let name = deployment
+                .metadata
+                .name
+                .as_ref()
+                .expect("Name must be present");
+            log::error!(
+                "Deployment {} is missing required 'target_status' label",
+                name
+            );
             Status::Error
+        });
+
+    if let Some(status) = deployment.status.as_ref() {
+        let deploy_status = if status.available_replicas.unwrap_or(0) > 0 {
+            Status::Running
+        } else {
+            Status::Ready
+        };
+        match (deploy_status, target_status) {
+            (Status::Running, Status::Running) => Status::Running,
+            (Status::Ready, Status::Ready) => Status::Ready,
+            (Status::Ready, Status::Running) => Status::Pending,
+            (Status::Running, Status::Ready) => Status::Pending,
+            (_, _) => Status::Error,
         }
+    } else {
+        Status::Error
+    }
 }
