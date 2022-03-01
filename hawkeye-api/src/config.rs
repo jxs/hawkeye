@@ -19,7 +19,7 @@ lazy_static! {
 
     /// The docker image of the "hawkeye-worker" to be used in the K8s Deployment resource template
     pub static ref DOCKER_IMAGE: String =
-        std::env::var(DOCKER_IMAGE_ENV).unwrap_or_else(|_| "hawkeye-dev:latest".into());
+        std::env::var(DOCKER_IMAGE_ENV).unwrap_or_else(|_| "hawkeye-worker:latest".into());
 
     /// A fixed authentication token required by clients while calling the Hawkeye API
     pub static ref FIXED_TOKEN: String =
@@ -30,8 +30,8 @@ lazy_static! {
 }
 
 /// In case the environment variable `HAWKEYE_FIXED_TOKEN` is not present, a
-/// random token between 20 and 30 characters is generated. The random token is exposed in a log
-/// message for visibility.
+/// random token between 20 and 30 characters is generated. The random token is exposed
+/// in a log message for visibility.
 fn gen_token() -> String {
     let mut rng = thread_rng();
     let n: usize = rng.gen_range(20, 30);

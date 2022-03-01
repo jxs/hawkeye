@@ -1,14 +1,17 @@
+use crate::config::{SLATE_URL_FILE_EXTENSIONS, SLATE_URL_SCHEMES};
 use color_eyre::{eyre::eyre, Result};
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 use std::collections::HashMap;
+use std::ffi::OsStr;
+use std::path::Path;
+use url::Url;
 
 #[skip_serializing_none]
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
 pub struct Watcher {
     pub id: Option<String>,
     pub description: Option<String>,
-    pub slate_url: String,
     pub status: Option<Status>,
     pub status_description: Option<String>,
     pub source: Source,
@@ -17,14 +20,11 @@ pub struct Watcher {
 
 impl Watcher {
     pub fn is_valid(&self) -> Result<()> {
-        if self.slate_url.starts_with("http://")
-            || self.slate_url.starts_with("https://")
-            || self.slate_url.starts_with("file://")
-        {
-            Ok(self.source.is_valid()?)
-        } else {
-            Err(eyre!("{} not recognized as a valid URL!", self.slate_url))
-        }
+        self.transitions
+            .iter()
+            .try_for_each(|t| t.is_valid())
+            // Validate the source.
+            .and(self.source.is_valid())
     }
 }
 
@@ -88,11 +88,49 @@ pub struct Transition {
     pub actions: Vec<Action>,
 }
 
-#[derive(Serialize, Deserialize, Copy, Clone, Debug, Eq, PartialEq)]
+impl Transition {
+    fn is_valid(&self) -> Result<()> {
+        self.from.is_valid().and(self.to.is_valid())
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
 #[serde(rename_all = "lowercase")]
+#[serde(tag = "frame_type", content = "slate_context")]
 pub enum VideoMode {
-    Slate,
+    Slate { url: String },
     Content,
+}
+
+impl VideoMode {
+    pub fn is_valid(&self) -> Result<()> {
+        match self {
+            VideoMode::Slate { url } => {
+                let parsed_url = Url::parse(url)?;
+                Path::new(parsed_url.path())
+                    .extension()
+                    .and_then(OsStr::to_str)
+                    .ok_or_else(|| eyre!("Invalid URL"))
+                    .and_then(|ext| {
+                        let scheme = parsed_url.scheme();
+                        if !SLATE_URL_FILE_EXTENSIONS.contains(&ext.to_string()) {
+                            Err(eyre!(
+                                "Invalid `slate_url` file extension. Valid values are: {}",
+                                SLATE_URL_FILE_EXTENSIONS.join(", "),
+                            ))
+                        } else if !SLATE_URL_SCHEMES.contains(&scheme.to_string()) {
+                            Err(eyre!(
+                                "Invalid `slate_url` URL scheme. Valid values are: {}",
+                                SLATE_URL_SCHEMES.join(", "),
+                            ))
+                        } else {
+                            Ok(())
+                        }
+                    })
+            }
+            VideoMode::Content => Ok(()),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
@@ -189,7 +227,6 @@ mod tests {
         Watcher {
             id: Some("ee21fc9a-7225-450b-a2a7-2faf914e35b8".to_string()),
             description: Some("UEFA 2020 - Lyon vs. Bayern".to_string()),
-            slate_url: "file://./resources/slate_120px.jpg".to_string(),
             status: Some(Status::Running),
             status_description: None,
             source: Source {
@@ -202,7 +239,7 @@ mod tests {
             transitions: vec![
                 Transition {
                     from: VideoMode::Content,
-                    to: VideoMode::Slate,
+                    to: VideoMode::Slate { url: "file://./resources/slate_fixtures/slate-0-cbsaa-213x120.jpg".to_string() },
                     actions: vec![
                         Action::HttpCall( HttpCall {
                             description: Some("Trigger AdBreak using API".to_string()),
@@ -220,9 +257,9 @@ mod tests {
                     ]
                 },
                 Transition {
-                    from: VideoMode::Slate,
+                    from: VideoMode::Slate {url: "file://./resources/slate_fixtures/slate-0-cbsaa-213x120.jpg".to_string()},
                     to: VideoMode::Content,
-                    actions: vec![
+                    actions: vec ![
                         Action::HttpCall( HttpCall {
                             description: Some("Use dump out of AdBreak API call".to_string()),
                             method: HttpMethod::DELETE,
@@ -243,12 +280,39 @@ mod tests {
     }
 
     #[test]
-    fn check_slate_url_is_url() {
-        let mut w = get_watcher();
-        assert!(w.is_valid().is_ok());
+    fn check_videomode_slate_url_validates_url_happy() {
+        let video_mode = VideoMode::Slate {
+            url: "http://bar.baz/zing.png".to_string(),
+        };
+        assert!(video_mode.is_valid().is_ok());
+    }
 
-        w.slate_url = String::from("something else");
-        assert!(w.is_valid().is_err());
+    #[test]
+    fn check_videomode_slate_url_invalidates_bad_scheme() {
+        let video_mode = VideoMode::Slate {
+            url: "uhoh://bar.baz/zing.png".to_string(),
+        };
+        assert!(video_mode.is_valid().is_err());
+        assert!(video_mode
+            .is_valid()
+            .err()
+            .unwrap()
+            .to_string()
+            .contains("URL scheme"));
+    }
+
+    #[test]
+    fn check_videomode_slate_url_validates_extension_happy() {
+        let video_mode = VideoMode::Slate {
+            url: "uhoh://bar.baz/zing.uhoh".to_string(),
+        };
+        assert!(video_mode.is_valid().is_err());
+        assert!(video_mode
+            .is_valid()
+            .err()
+            .unwrap()
+            .to_string()
+            .contains("file extension"));
     }
 
     #[test]
@@ -262,7 +326,8 @@ mod tests {
 
     #[test]
     fn deserialize_as_expected() {
-        let mut fixture = File::open("../fixtures/watcher.json").expect("Fixture was not found!");
+        let mut fixture =
+            File::open("../fixtures/watcher-basic.json").expect("Fixture was not found!");
         let mut expected_value = String::new();
         fixture.read_to_string(&mut expected_value).unwrap();
         let expected: Watcher = serde_json::from_str(expected_value.as_str()).unwrap();
@@ -272,7 +337,8 @@ mod tests {
 
     #[test]
     fn serialize_as_expected() {
-        let mut fixture = File::open("../fixtures/watcher.json").expect("Fixture was not found!");
+        let mut fixture =
+            File::open("../fixtures/watcher-basic.json").expect("Fixture was not found!");
         let mut expected_value = String::new();
         fixture.read_to_string(&mut expected_value).unwrap();
         let fixture: serde_json::Value = serde_json::from_str(expected_value.as_str()).unwrap();

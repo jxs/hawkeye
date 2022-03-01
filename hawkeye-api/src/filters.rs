@@ -1,9 +1,12 @@
 use crate::{auth, handlers};
+use eyre::ErrReport;
 use hawkeye_core::models::Watcher;
 use kube::Client;
 use serde::Serialize;
+use std::fmt::Display;
 use warp::hyper::StatusCode;
-use warp::Filter;
+use warp::reply::Response;
+use warp::{reject, Filter};
 
 /// API root for v1
 pub fn v1(
@@ -132,23 +135,62 @@ fn json_body() -> impl Filter<Extract = (Watcher,), Error = warp::Rejection> + C
 }
 
 /// An API error serializable to JSON.
-#[derive(Serialize)]
-struct ErrorMessage {
-    message: String,
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct ErrorResponse {
+    pub message: String,
+}
+
+impl reject::Reject for ErrorResponse {}
+
+impl Display for ErrorResponse {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", self.message)
+    }
+}
+
+impl ErrorResponse {
+    pub fn new<S: AsRef<str>>(message: S) -> Self {
+        Self {
+            message: message.as_ref().to_string(),
+        }
+    }
+}
+
+impl From<eyre::ErrReport> for ErrorResponse {
+    fn from(err: ErrReport) -> Self {
+        let e = match err.downcast::<ErrorResponse>() {
+            Ok(e) => return e,
+            Err(e) => e,
+        };
+
+        ErrorResponse::new(e.to_string().as_str())
+    }
+}
+
+impl warp::Reply for ErrorResponse {
+    fn into_response(self) -> Response {
+        let json = warp::reply::json(&self);
+        warp::reply::with_status(json, StatusCode::UNPROCESSABLE_ENTITY).into_response()
+    }
 }
 
 async fn handle_rejection(
     err: warp::Rejection,
 ) -> Result<impl warp::Reply, std::convert::Infallible> {
-    let message = "Error calling the API".to_string();
-    let code;
-
     log::debug!("Rejection = {:?}", err);
+    let mut message = "".to_string();
+    let code;
 
     if err.is_not_found() {
         code = StatusCode::NOT_FOUND;
+    } else if let Some(err) = err.find::<warp::filters::body::BodyDeserializeError>() {
+        code = StatusCode::BAD_REQUEST;
+        message = err.to_string();
     } else if err.find::<auth::NoAuth>().is_some() {
         code = StatusCode::UNAUTHORIZED;
+    } else if let Some(e) = err.find::<ErrorResponse>() {
+        code = StatusCode::UNPROCESSABLE_ENTITY;
+        message = e.message.to_owned();
     } else if let Some(missing) = err.find::<warp::reject::MissingHeader>() {
         if missing.name() == "authorization" {
             code = StatusCode::UNAUTHORIZED;
@@ -162,6 +204,13 @@ async fn handle_rejection(
         code = StatusCode::INTERNAL_SERVER_ERROR;
     }
 
-    let json = warp::reply::json(&ErrorMessage { message });
+    // Use the status code's text value as the default message if none supplied.
+    message.is_empty().then(|| {
+        message = match &code.canonical_reason() {
+            Some(reason) => reason.to_string(),
+            None => "an unknown server error has occurred".to_string(),
+        }
+    });
+    let json = warp::reply::json(&ErrorResponse { message });
     Ok(warp::reply::with_status(json, code))
 }

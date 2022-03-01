@@ -95,7 +95,10 @@ impl TempFile {
 
     pub fn from_original<S: AsRef<str>>(full_path: S) -> Result<Self> {
         Ok(Self {
-            file: File::open(full_path.as_ref()).wrap_err("Failed open provided path")?,
+            file: File::open(full_path.as_ref()).wrap_err(format!(
+                "Failed to open provided path: {:#?}",
+                full_path.as_ref()
+            ))?,
             path: String::from(full_path.as_ref()),
         })
     }

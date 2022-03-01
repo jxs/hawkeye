@@ -1,34 +1,111 @@
 use color_eyre::Result;
 use dssim::{DssimImage, ToRGBAPLU, RGBAPLU};
+use hawkeye_core::models::{Transition, VideoMode};
 use imgref::{Img, ImgVec};
+use itertools::Itertools;
 use load_image::{Image, ImageData};
 
-pub struct SlateDetector {
+const BLACK_SLATE: &str = "black_slate";
+
+pub struct Slate {
     slate: DssimImage<f32>,
     similarity_algorithm: dssim::Dssim,
+    // TODO: This should probably be a ref. Needs a lifetime specifier.
+    pub(crate) transition: Option<Transition>,
 }
 
-impl SlateDetector {
-    pub fn new(slate: &[u8]) -> Result<Self> {
+impl Slate {
+    /// Create a new Slate using the image bytes and the selected similarity algorithm.
+    /// Note: similarity_algorithm can only be `dssim::Dssim` at the moment, so this is
+    /// essentially hardcoded in type and value.
+    pub fn new(slate_data: &[u8], transition: Option<Transition>) -> Result<Self> {
+        let slate_img = load_data(slate_data)?;
+
+        // There's only one algo at the moment, so hardcode it instead of making it an
+        // argument.
         let similarity_algorithm = dssim::Dssim::new();
-        let slate_img = load_data(slate)?;
         let slate = similarity_algorithm.create_image(&slate_img).unwrap();
 
         Ok(Self {
             slate,
+            transition,
             similarity_algorithm,
         })
     }
 
-    pub fn is_match(&self, image_buffer: &[u8]) -> bool {
-        let frame_img = load_data(image_buffer).unwrap();
-        let frame = self.similarity_algorithm.create_image(&frame_img).unwrap();
-
+    /// Compare the the slate's image to the frame's image via DSSIM.
+    pub fn is_match(&self, frame: &DssimImage<f32>) -> (bool, u32) {
         let (res, _) = self.similarity_algorithm.compare(&self.slate, frame);
         let val: f64 = res.into();
         let val = (val * 1000f64) as u32;
 
-        val <= 900u32
+        (val <= 900u32, val)
+    }
+}
+
+/// Provide functionality to match a set of slates to an incoming image_buffer, typically from a
+/// frame in a stream of video.
+pub struct SlateDetector {
+    slates: Vec<Slate>,
+    // TODO: this should either be here (ideal) or on each Slate.
+    similarity_algorithm: dssim::Dssim,
+}
+
+impl SlateDetector {
+    pub fn new(slates: Vec<Slate>) -> Result<Self> {
+        // There's only one algo at the moment, so hardcode it instead of making it an argument.
+        let similarity_algorithm = dssim::Dssim::new();
+
+        Ok(Self {
+            slates,
+            similarity_algorithm,
+        })
+    }
+
+    /// Attempt to find a slate that most closely resembles the incoming
+    /// `image_buffer`. If there's more than a single match, the one with lowest score
+    /// is taken (the "most" matched).
+    pub fn matched_slate(&self, image_buffer: &[u8]) -> Option<&Slate> {
+        let frame_img = load_data(image_buffer).unwrap();
+        let frame = self.similarity_algorithm.create_image(&frame_img).unwrap();
+        self.slates
+            .iter()
+            .filter_map(|slate| {
+                let (is_match, match_score) = slate.is_match(&frame);
+                match is_match {
+                    true => {
+                        let slate_url = slate.transition.as_ref().map_or_else(
+                            || BLACK_SLATE,
+                            |transition| match &transition.from {
+                                VideoMode::Slate { url } => url,
+                                _ => match &transition.to {
+                                    VideoMode::Slate { url } => url,
+                                    _ => "unknown slate?",
+                                },
+                            },
+                        );
+
+                        log::debug!(
+                            "is_match matched a slate: score={} url={:?}",
+                            match_score,
+                            slate_url,
+                        );
+                        Some((slate, match_score, slate_url))
+                    }
+                    false => None,
+                }
+            })
+            .sorted_by_key(|slate_score_data| slate_score_data.1)
+            .next()
+            .map(|(slate, score, slate_url)| {
+                log::debug!(
+                    "is_match winning matched slate: score={} url={}",
+                    score,
+                    slate_url,
+                );
+
+                slate
+            })
     }
 }
 
@@ -67,29 +144,33 @@ mod test {
 
     #[test]
     fn compare_equal_images() {
-        let mut slate =
-            File::open("../resources/slate_120px.jpg").expect("Missing file in resources folder");
+        let mut slate = File::open("../resources/slate_fixtures/slate-0-cbsaa-213x120.jpg")
+            .expect("Missing file in resources folder");
         let mut buffer = Vec::new();
         slate
             .read_to_end(&mut buffer)
             .expect("Failed to write to buffer");
-        let detector = SlateDetector::new(buffer.as_slice()).unwrap();
-        let slate_img = read_bytes("../resources/slate_120px.jpg");
+        let slate = Slate::new(buffer.as_slice(), None).unwrap();
+        let detector = SlateDetector::new(vec![slate]).unwrap();
+        let slate_img = read_bytes("../resources/slate_fixtures/slate-0-cbsaa-213x120.jpg");
+        let matched_slate = detector.matched_slate(slate_img.as_slice());
 
-        assert!(detector.is_match(slate_img.as_slice()));
+        assert!(matched_slate.is_some())
     }
 
     #[test]
     fn compare_diff_images() {
-        let mut slate =
-            File::open("../resources/slate_120px.jpg").expect("Missing file in resources folder");
+        let mut slate = File::open("../resources/slate_fixtures/slate-0-cbsaa-213x120.jpg")
+            .expect("Missing file in resources folder");
         let mut buffer = Vec::new();
         slate
             .read_to_end(&mut buffer)
             .expect("Failed to write to buffer");
-        let detector = SlateDetector::new(buffer.as_slice()).unwrap();
-        let frame_img = read_bytes("../resources/non-slate_120px.jpg");
+        let slate = Slate::new(buffer.as_slice(), None).unwrap();
+        let detector = SlateDetector::new(vec![slate]).unwrap();
+        let frame_img = read_bytes("../resources/slate_fixtures/non-slate-213x120.jpg");
+        let matched_slate = detector.matched_slate(frame_img.as_slice());
 
-        assert_eq!(detector.is_match(frame_img.as_slice()), false);
+        assert!(matched_slate.is_none())
     }
 }

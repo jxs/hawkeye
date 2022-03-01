@@ -1,4 +1,5 @@
 use crate::config::{CALL_WATCHER_TIMEOUT, NAMESPACE};
+use crate::filters::ErrorResponse;
 use crate::templates;
 use crate::templates::container_spec;
 use hawkeye_core::models::{Status, Watcher};
@@ -59,6 +60,15 @@ pub async fn create_watcher(
     client: Client,
 ) -> Result<impl warp::Reply, Infallible> {
     log::debug!("v1.create_watcher: {:?}", watcher);
+
+    // TODO: THis could use another iteration to make it happen more automatically.
+    if let Some(err) = watcher.is_valid().err() {
+        let fe: ErrorResponse = err.into();
+        return Ok(reply::with_status(
+            reply::json(&fe),
+            StatusCode::UNPROCESSABLE_ENTITY,
+        ));
+    }
 
     let new_id = Uuid::new_v4().to_string();
     watcher.id = Some(new_id.clone());
@@ -162,10 +172,10 @@ pub async fn upgrade_watcher(id: String, client: Client) -> Result<impl warp::Re
             let msg: String = format!("Error while calling Kubernetes API: {:?}", e);
             log::error!("{}", msg);
             let error_body = json!({ "message": msg });
-            return Ok(reply::with_status(
+            Ok(reply::with_status(
                 reply::json(&error_body),
                 StatusCode::INTERNAL_SERVER_ERROR,
-            ));
+            ))
         }
     }
 }
@@ -312,7 +322,7 @@ pub async fn get_video_frame(id: String, client: Client) -> Result<impl warp::Re
             .build()
             .unwrap();
         // Try for new and old ports in pod
-        for port in vec![watcher.source.ingest_port, 3030] {
+        for port in &[watcher.source.ingest_port, 3030] {
             let url = format!("http://{}:{}/latest_frame", pod_ip, port);
 
             log::info!("Calling Pod using url: {}", url);
@@ -388,8 +398,10 @@ pub async fn start_watcher(id: String, client: Client) -> Result<impl warp::Repl
         )),
         Status::Ready => {
             // Start Watcher by setting Kubernetes deployment replicas=1
-            let mut patch_params = PatchParams::default();
-            patch_params.field_manager = Some("hawkeye_api".to_string());
+            let patch_params = PatchParams {
+                field_manager: Some("hawkeye_api".to_string()),
+                ..Default::default()
+            };
 
             // Set Kubernetes deployment replica=1 via patch.
             let deployment_scale_json = json!({
@@ -472,8 +484,10 @@ pub async fn stop_watcher(id: String, client: Client) -> Result<impl warp::Reply
         )),
         Status::Running => {
             // Stop watcher / replicas to 0
-            let mut patch_params = PatchParams::default();
-            patch_params.field_manager = Some("hawkeye_api".to_string());
+            let patch_params = PatchParams {
+                field_manager: Some("hawkeye_api".to_string()),
+                ..Default::default()
+            };
 
             let deployment_scale_json = json!({
                 "apiVersion": "autoscaling/v1",

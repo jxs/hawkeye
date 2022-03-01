@@ -1,7 +1,6 @@
 {
   "id": "ee21fc9a-7225-450b-a2a7-2faf914e35b8",
   "description": "UEFA 2020 - Lyon vs. Bayern",
-  "slate_url": "file://./resources/slate_120px.jpg",
   "status": "running",
   "source": {
     "ingest_port": 5000,
@@ -13,8 +12,15 @@
   },
   "transitions": [
     {
-      "from": "content",
-      "to": "slate",
+      "from": {
+        "frame_type": "content"
+      },
+      "to": {
+        "frame_type": "slate",
+        "slate_context": {
+          "url": "file://./resources/slate_fixtures/slate-0-cbsaa-213x120.jpg"
+        }
+      },
       "actions": [
         {
           "description": "Trigger AdBreak using API",
@@ -37,8 +43,15 @@
       ]
     },
     {
-      "from": "slate",
-      "to": "content",
+      "from": {
+        "frame_type": "slate",
+        "slate_context": {
+          "url": "file://./resources/slate_fixtures/slate-0-cbsaa-213x120.jpg"
+        }
+      },
+      "to": {
+        "frame_type": "content"
+      },
       "actions": [
         {
           "description": "Use dump out of AdBreak API call",

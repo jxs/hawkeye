@@ -23,9 +23,8 @@ async fn main() -> anyhow::Result<()> {
         pretty_env_logger::init();
     }
 
-    let client = Client::try_default().await?;
-
-    let v1 = filters::v1(client);
+    let k8s_client = Client::try_default().await?;
+    let v1 = filters::v1(k8s_client);
     let routes = v1.with(warp::log("watchers"));
 
     log::info!("Running API at 0.0.0.0:8080 ..");

@@ -4,7 +4,7 @@ use std::borrow::Cow;
 
 /// Helper for bootstrapping Sentry based on HAWKEYE_ENV to capture panics and logs for context.
 pub fn maybe_bootstrap_sentry() -> Option<ClientInitGuard> {
-    if *config::SENTRY_ENABLED == false {
+    if !*config::SENTRY_ENABLED {
         log::debug!("SENTRY_ENABLED is not true. Skipping Sentry initialization.");
         return None;
     }
@@ -33,7 +33,7 @@ pub fn maybe_bootstrap_sentry() -> Option<ClientInitGuard> {
         }),
     ));
 
-    return Some(sentry_client);
+    Some(sentry_client)
 }
 
 #[cfg(test)]
@@ -42,23 +42,20 @@ mod tests {
     use std::env;
 
     #[test]
-    fn test_sentry_not_enabled_prevents_sentry_bootstrap() {
+    fn test_sentry_bootstrapping() {
+        // not enabled
         env::set_var("HAWKEYE_SENTRY_DSN", "https://abc123");
         env::set_var("HAWKEYE_SENTRY_ENABLED", "0");
         let sentry = utils::maybe_bootstrap_sentry();
         assert!(sentry.is_none());
-    }
 
-    #[test]
-    fn test_sentry_enabled_but_no_dsn_prevents_sentry_bootstrap() {
+        // missing DSN
         env::remove_var("HAWKEYE_SENTRY_DSN");
         env::set_var("HAWKEYE_SENTRY_ENABLED", "1");
         let sentry = utils::maybe_bootstrap_sentry();
         assert!(sentry.is_none());
-    }
 
-    #[test]
-    fn test_sentry_enabled_but_invalid_dsn_prevents_sentry_bootstrap() {
+        // invalid DSN
         env::set_var("HAWKEYE_SENTRY_DSN", "oops");
         env::set_var("HAWKEYE_SENTRY_ENABLED", "1");
         let sentry = utils::maybe_bootstrap_sentry();

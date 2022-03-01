@@ -1,4 +1,4 @@
-use crate::img_detector::SlateDetector;
+use crate::img_detector::{Slate, SlateDetector};
 use crate::metrics::{
     FOUND_CONTENT_COUNTER, FOUND_SLATE_COUNTER, FRAME_PROCESSING_DURATION,
     SIMILARITY_EXECUTION_COUNTER, SIMILARITY_EXECUTION_DURATION,
@@ -33,7 +33,7 @@ struct ErrorMessage {
     source: glib::Error,
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Event {
     Terminate,
     Mode(VideoMode),
@@ -41,14 +41,20 @@ pub enum Event {
 
 pub fn process_frames(
     frame_source: impl Iterator<Item = Result<Option<Vec<u8>>>>,
-    detector: SlateDetector,
+    slate_detector: &SlateDetector,
     running: Arc<AtomicBool>,
-    action_sink: Sender<Event>,
+    action_sink: Sender<TransitionChange>,
 ) -> Result<()> {
-    let black_image = include_bytes!("../../resources/black_120px.jpg");
-    let black_detector = SlateDetector::new(black_image)?;
+    log::debug!("process_frames called...");
 
+    let black_image = include_bytes!("../../resources/slate_fixtures/black-213x120.jpg");
+    let black_slate = Slate::new(black_image, None)?;
+    let black_detector = SlateDetector::new(vec![black_slate])?;
+
+    // TODO: This is just for debugging and to know if there were results from the
+    // frame_source iterator without any frames.
     let mut empty_iterations = 0;
+
     for frame in frame_source {
         let frame_processing_timer = FRAME_PROCESSING_DURATION.start_timer();
         let local_buffer = match frame? {
@@ -68,14 +74,15 @@ pub fn process_frames(
             }
         };
 
-        let is_black = black_detector.is_match(local_buffer.as_slice());
+        let is_black = black_detector
+            .matched_slate(local_buffer.as_slice())
+            .is_some();
 
-        let mut is_match = false;
+        let mut matched_slate: Option<&Slate> = None;
+
         if !is_black {
             let t = SIMILARITY_EXECUTION_DURATION.start_timer();
-
-            is_match = detector.is_match(local_buffer.as_slice());
-
+            matched_slate = slate_detector.matched_slate(local_buffer.as_slice());
             let took_in_seconds = t.stop_and_record();
             log::trace!("Similarity algorithm ran in {} seconds", took_in_seconds);
         }
@@ -88,30 +95,46 @@ pub fn process_frames(
             write_txn.commit();
         }
 
+        // If the slate is black, then it clearly won't match a slate image.
         if is_black {
             continue;
         }
 
-        if is_match {
-            log::trace!("Found slate image in video stream!");
-            FOUND_SLATE_COUNTER.inc();
-            action_sink.send(Event::Mode(VideoMode::Slate)).unwrap();
-        } else {
-            FOUND_CONTENT_COUNTER.inc();
-            action_sink.send(Event::Mode(VideoMode::Content)).unwrap();
-            log::trace!("Content in video stream!");
+        // If the frame matched a slate, then start the Slate workflow.
+        match matched_slate {
+            Some(_) => {
+                log::trace!("Found slate image in video stream!");
+                FOUND_SLATE_COUNTER.inc();
+                let video_mode = matched_slate
+                    .and_then(|s| s.transition.as_ref())
+                    .map(|t| &t.to)
+                    .unwrap();
+                let tchange = TransitionChange::new(Event::Mode(video_mode.to_owned()));
+                action_sink.send(tchange)?;
+            }
+            None => {
+                log::trace!("Content in video stream!");
+                FOUND_CONTENT_COUNTER.inc();
+                let tchange = TransitionChange::new(Event::Mode(VideoMode::Content));
+                action_sink.send(tchange)?;
+            }
         }
+
         SIMILARITY_EXECUTION_COUNTER.inc();
 
+        // Trace the frame processing time.
         let took_in_seconds = frame_processing_timer.stop_and_record();
         log::trace!("Frame processing took {} seconds", took_in_seconds);
+
+        // Stop running if the AtomicBool `running` is no longer truthy.
         if !running.load(Ordering::SeqCst) {
             break;
         }
     }
 
     info!("Stopping pipeline gracefully!");
-    action_sink.send(Event::Terminate)?;
+    let tc = TransitionChange::new(Event::Terminate);
+    action_sink.send(tc)?;
 
     Ok(())
 }
@@ -338,5 +361,16 @@ impl Drop for VideoStreamIterator {
             log::error!("Could not stop pipeline");
         }
         log::debug!("Pipeline stopped!");
+    }
+}
+
+#[derive(Debug, Eq, PartialEq)]
+pub struct TransitionChange {
+    pub event: Event,
+}
+
+impl TransitionChange {
+    pub fn new(event: Event) -> Self {
+        Self { event }
     }
 }
