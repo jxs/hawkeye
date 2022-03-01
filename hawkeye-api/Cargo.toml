@@ -1,6 +1,6 @@
 [package]
 name = "hawkeye-api"
-version = "0.2.0"
+version = "0.2.2"
 authors = ["Rafael Caricio <rafael@caricio.com>", "Lyle Scott <lyle@ls3.io>"]
 edition = "2018"
 license = "MIT"
