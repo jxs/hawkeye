@@ -1,9 +1,11 @@
 use k8s_openapi::api::apps::v1::Deployment;
 use kube::Api;
 use kube::api::{Patch, PatchParams};
-use kube::client::Status;
 use serde_json::json;
+use hawkeye_core::models::Status;
 use crate::{config, templates};
+use serde::Deserialize;
+use thiserror::Error;
 
 #[derive(Debug, Deserialize, Error)]
 pub enum WatcherStartStatus {
@@ -11,7 +13,7 @@ pub enum WatcherStartStatus {
     AlreadyRunning,  // ok
     #[error("Watcher is updating so it cannot be started.")]
     CurrentlyUpdating,  // conflict
-    #[error("Watching is starting.")]
+    #[error("Watcher is starting.")]
     Starting, // ok
     #[error("Watcher is in an error state and cannot be stopped.")]
     InErrorState,  // NOT_ACCEPTABLE
@@ -33,9 +35,8 @@ pub enum WatcherStopStatus {
     NotFound, // 404
 }
 
-pub async fn start_watcher(k8s_client: &kube::Client) -> WatcherStartStatus {
-    let deployments_client: Api<Deployment> = Api::namespaced(client.clone(), &config::NAMESPACE);
-    // TODO: probably better to just get the scale
+pub async fn start_watcher(k8s_client: &kube::Client, watcher_id: &str) -> WatcherStartStatus {
+    let deployments_client: Api<Deployment> = Api::namespaced(k8s_client.clone(), &config::NAMESPACE);
     let deployment = match deployments_client
         .get(&templates::deployment_name(&watcher_id))
         .await
@@ -50,6 +51,7 @@ pub async fn start_watcher(k8s_client: &kube::Client) -> WatcherStartStatus {
     match get_watcher_status(&deployment) {
         Status::Running => WatcherStartStatus::AlreadyRunning,
         Status::Pending => WatcherStartStatus::CurrentlyUpdating,
+        Status::Error => WatcherStartStatus::InErrorState,
         Status::Ready => {
             // Start Watcher by setting Kubernetes deployment replicas=1
             let patch_params = PatchParams {
@@ -60,7 +62,7 @@ pub async fn start_watcher(k8s_client: &kube::Client) -> WatcherStartStatus {
             // Set Kubernetes deployment replica=1 via patch.
             let deployment_scale_json = json!({
                 "apiVersion": "autoscaling/v1",
-                "spec": { "replicas": 1 },
+                "spec": { "replicas": 1 as u16 },
             });
             deployments_client
                 .patch_scale(
@@ -91,12 +93,11 @@ pub async fn start_watcher(k8s_client: &kube::Client) -> WatcherStartStatus {
 
             WatcherStartStatus::Starting
         }
-        Status::Error => WatcherStartStatus::InErrorState,
     }
 }
 
-pub async fn stop_watcher(k8s_client: &kube::Client) -> WatcherStopStatus {
-    let deployments_client: Api<Deployment> = Api::namespaced(client.clone(), &config::NAMESPACE);
+pub async fn stop_watcher(k8s_client: &kube::Client, watcher_id: &str) -> WatcherStopStatus {
+    let deployments_client: Api<Deployment> = Api::namespaced(k8s_client.clone(), &config::NAMESPACE);
     // TODO: probably better to just get the scale
     let deployment = match deployments_client
         .get(&templates::deployment_name(&watcher_id))
@@ -111,6 +112,7 @@ pub async fn stop_watcher(k8s_client: &kube::Client) -> WatcherStopStatus {
     match get_watcher_status(&deployment) {
         Status::Ready => WatcherStopStatus::AlreadyStopped,
         Status::Pending => WatcherStopStatus::CurrentlyUpdating,
+        Status::Error => WatcherStopStatus::InErrorState,
         Status::Running => {
             // Stop watcher / replicas to 0
             let patch_params = PatchParams {
@@ -120,7 +122,7 @@ pub async fn stop_watcher(k8s_client: &kube::Client) -> WatcherStopStatus {
 
             let deployment_scale_json = json!({
                 "apiVersion": "autoscaling/v1",
-                "spec": { "replicas": 0 },
+                "spec": { "replicas": 0 as u16 },
             });
             deployments_client
                 .patch_scale(
@@ -151,12 +153,11 @@ pub async fn stop_watcher(k8s_client: &kube::Client) -> WatcherStopStatus {
 
             WatcherStopStatus::Stopping
         }
-        Status::Error => WatcherStopStatus::InErrorState,
     }
 }
 
 
-fn get_watcher_status(deployment: &Deployment) {
+fn get_watcher_status(deployment: &Deployment) -> Status{
     let target_status = deployment
             .metadata
             .labels

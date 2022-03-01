@@ -2,7 +2,7 @@
 name = "hawkeye-core"
 version = "0.2.2"
 authors = ["Rafael Caricio <rafael@caricio.com>"]
-edition = "2018"
+edition = "2021"
 license = "MIT"
 repository = "https://github.com/cbsinteractive/hawkeye"
 
