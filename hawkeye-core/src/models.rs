@@ -74,7 +74,7 @@ impl Watcher {
         self.transitions.iter().try_for_each(|t| t.is_valid())
     }
 
-    pub fn merge(&mut self, other_watcher: Watcher) -> () {
+    pub fn merge(&mut self, other_watcher: Watcher) {
         self.description = other_watcher.description;
         self.source = other_watcher.source;
         self.transitions = other_watcher.transitions;

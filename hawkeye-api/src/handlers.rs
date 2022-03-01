@@ -379,18 +379,12 @@ pub async fn get_watcher(
         let status_description = pods
             .items
             .first()
-            .map(|p| p.status.as_ref())
-            .flatten()
-            .map(|ps| ps.container_statuses.as_ref())
-            .flatten()
-            .map(|css| css.first())
-            .flatten()
-            .map(|cs| cs.state.as_ref())
-            .flatten()
-            .map(|cs| cs.waiting.as_ref())
-            .flatten()
-            .map(|csw| csw.message.clone())
-            .flatten();
+            .and_then(|p| p.status.as_ref())
+            .and_then(|ps| ps.container_statuses.as_ref())
+            .and_then(|css| css.first())
+            .and_then(|cs| cs.state.as_ref())
+            .and_then(|cs| cs.waiting.as_ref())
+            .and_then(|csw| csw.message.clone());
         log::debug!(
             "Additional information for the Pending status: {:?}",
             status_description.as_ref()
@@ -411,14 +405,10 @@ pub async fn get_watcher(
         service
             .status
             .as_ref()
-            .map(|s| s.load_balancer.as_ref())
-            .flatten()
-            .map(|lbs| lbs.ingress.as_ref())
-            .flatten()
-            .map(|lbs| lbs.first())
-            .flatten()
-            .map(|lb| lb.clone().hostname.or(lb.clone().ip))
-            .flatten()
+            .and_then(|s| s.load_balancer.as_ref())
+            .and_then(|lbs| lbs.ingress.as_ref())
+            .and_then(|lbs| lbs.first())
+            .and_then(|lb| lb.clone().hostname.or(lb.clone().ip))
     } else {
         None
     };
@@ -473,10 +463,8 @@ pub async fn get_video_frame(
     if let Some(pod_ip) = pods
         .items
         .first()
-        .map(|p| p.status.as_ref())
-        .flatten()
-        .map(|ps| ps.pod_ip.clone())
-        .flatten()
+        .and_then(|p| p.status.as_ref())
+        .and_then(|ps| ps.pod_ip.clone())
     {
         let http_client = reqwest::Client::builder()
             .timeout(Duration::from_secs(*CALL_WATCHER_TIMEOUT))
@@ -551,7 +539,7 @@ pub async fn start_watcher(
             // Set Kubernetes deployment replica=1 via patch.
             let deployment_scale_json = json!({
                 "apiVersion": "autoscaling/v1",
-                "spec": { "replicas": 1 as u16 },
+                "spec": { "replicas": 1_u16 },
             });
             let deployments_client: Api<Deployment> =
                 Api::namespaced(k8s_client.clone(), &config::NAMESPACE);
@@ -621,7 +609,7 @@ pub async fn stop_watcher(
 
             let deployment_scale_json: Value = json!({
                 "apiVersion": "autoscaling/v1",
-                "spec": { "replicas": 0 as i16 },
+                "spec": { "replicas": 0_i16 },
             });
             let deployments_client: Api<Deployment> =
                 Api::namespaced(k8s_client.clone(), &config::NAMESPACE);
@@ -728,12 +716,11 @@ impl WatcherStatus for Deployment {
             .metadata
             .labels
             .as_ref()
-            .map(|labels| {
+            .and_then(|labels| {
                 labels
                     .get("target_status")
                     .map(|status| serde_json::from_str(&format!("\"{}\"", status)).ok())
             })
-            .flatten()
             .flatten()
             .unwrap_or({
                 let name = self.metadata.name.as_ref().expect("Name must be present");

@@ -39,7 +39,7 @@ pub async fn start_watcher(k8s_client: &kube::Client, watcher_id: &str) -> Watch
     let deployments_client: Api<Deployment> =
         Api::namespaced(k8s_client.clone(), &config::NAMESPACE);
     let deployment = match deployments_client
-        .get(&templates::deployment_name(&watcher_id))
+        .get(&templates::deployment_name(watcher_id))
         .await
     {
         Ok(d) => d,
@@ -61,7 +61,7 @@ pub async fn start_watcher(k8s_client: &kube::Client, watcher_id: &str) -> Watch
             // Set Kubernetes deployment replica=1 via patch.
             let deployment_scale_json = json!({
                 "apiVersion": "autoscaling/v1",
-                "spec": { "replicas": 1 as u16 },
+                "spec": { "replicas": 1_u16 },
             });
             deployments_client
                 .patch_scale(
@@ -100,7 +100,7 @@ pub async fn stop_watcher(k8s_client: &kube::Client, watcher_id: &str) -> Watche
         Api::namespaced(k8s_client.clone(), &config::NAMESPACE);
     // TODO: probably better to just get the scale
     let deployment = match deployments_client
-        .get(&templates::deployment_name(&watcher_id))
+        .get(&templates::deployment_name(watcher_id))
         .await
     {
         Ok(d) => d,
@@ -120,7 +120,7 @@ pub async fn stop_watcher(k8s_client: &kube::Client, watcher_id: &str) -> Watche
 
             let deployment_scale_json = json!({
                 "apiVersion": "autoscaling/v1",
-                "spec": { "replicas": 0 as u16 },
+                "spec": { "replicas": 0_u16 },
             });
             deployments_client
                 .patch_scale(
@@ -159,7 +159,7 @@ fn get_watcher_status(deployment: &Deployment) -> Status {
         .metadata
         .labels
         .as_ref()
-        .map(|labels| {
+        .and_then(|labels| {
             labels
                 .get("target_status")
                 .map(|status| serde_json::from_str(&format!("\"{}\"", status)).ok())
