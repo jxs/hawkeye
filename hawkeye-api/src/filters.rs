@@ -15,6 +15,7 @@ pub fn v1(
     watchers_list(client.clone())
         .or(watcher_create(client.clone()))
         .or(watcher_get(client.clone()))
+        .or(watcher_update(client.clone()))
         .or(watcher_delete(client.clone()))
         .or(watcher_upgrade(client.clone()))
         .or(watcher_start(client.clone()))
@@ -45,6 +46,18 @@ pub fn watcher_create(
         .and(json_body())
         .and(with_client(client))
         .and_then(handlers::create_watcher)
+}
+
+/// PATCH /v1/watchers/{id}
+pub fn watcher_update(
+    client: Client,
+) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+    warp::path!("v1" / "watchers" / String)
+        .and(auth::verify())
+        .and(warp::put())
+        .and(json_body())
+        .and(with_client(client))
+        .and_then(handlers::update_watcher)
 }
 
 /// GET /v1/watchers/{id}

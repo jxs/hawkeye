@@ -18,6 +18,14 @@ pub struct Watcher {
     pub transitions: Vec<Transition>,
 }
 
+// #[skip_serializing_none]
+// #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
+// pub struct WatcherUpdate {
+//     pub description: Option<String>,
+//     pub source: Option<SourceUpdate>,
+//     pub transitions: Option<Vec<Transition>>,
+// }
+
 impl Watcher {
     pub fn is_valid(&self) -> Result<()> {
         self.transitions
@@ -25,6 +33,12 @@ impl Watcher {
             .try_for_each(|t| t.is_valid())
             // Validate the source.
             .and(self.source.is_valid())
+    }
+
+    pub fn merge(&mut self, other_watcher: Watcher) -> () {
+        self.description = other_watcher.description;
+        self.source = other_watcher.source;
+        self.transitions = other_watcher.transitions;
     }
 }
 

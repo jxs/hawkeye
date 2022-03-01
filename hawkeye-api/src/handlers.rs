@@ -1,7 +1,7 @@
 use crate::config::{CALL_WATCHER_TIMEOUT, NAMESPACE};
 use crate::filters::ErrorResponse;
-use crate::templates;
-use crate::templates::container_spec;
+use crate::templates::{configmap_name, container_spec, deployment_name, service_name};
+use crate::{backend, config, templates};
 use hawkeye_core::models::{Status, Watcher};
 use k8s_openapi::api::apps::v1::Deployment;
 use k8s_openapi::api::core::v1::{ConfigMap, Pod, Service};
@@ -16,6 +16,7 @@ use warp::http::header::{CACHE_CONTROL, CONTENT_TYPE};
 use warp::http::{HeaderValue, StatusCode};
 use warp::hyper::Body;
 use warp::reply;
+use crate::backend::{WatcherStartStatus, WatcherStopStatus};
 
 pub async fn list_watchers(client: Client) -> Result<impl warp::Reply, Infallible> {
     let lp = ListParams::default()
@@ -105,10 +106,144 @@ pub async fn create_watcher(
     ))
 }
 
-pub async fn upgrade_watcher(id: String, client: Client) -> Result<impl warp::Reply, Infallible> {
-    log::debug!("v1.upgrade_watcher: {}", id);
+pub async fn update_watcher(
+    watcher_id: String,
+    payload_watcher: Watcher,
+    k8s_client: Client,
+) -> Result<impl warp::Reply, Infallible> {
+    log::debug!("v1.update_watcher: {:?}", payload_watcher);
+
+    if let Some(err) = payload_watcher.is_valid().err() {
+        let fe: ErrorResponse = err.into();
+        return Ok(reply::with_status(
+            reply::json(&fe),
+            StatusCode::UNPROCESSABLE_ENTITY,
+        ));
+    }
+
+    // We use the ConfigMap as source of truth for what are the watchers we have
+    let config_maps_client: Api<ConfigMap> = Api::namespaced(k8s_client.clone(), &config::NAMESPACE);
+    let config_map = match config_maps_client
+        .get(&templates::configmap_name(&watcher_id))
+        .await
+    {
+        Ok(c) => c,
+        Err(_) => {
+            return Ok(reply::with_status(
+                reply::json(&json!({})),
+                StatusCode::NOT_FOUND,
+            ))
+        }
+    };
+
+    let deployments: Api<Deployment> = Api::namespaced(k8s_client.clone(), &config::NAMESPACE);
+    let deployment = match deployments
+        .get(&templates::deployment_name(&watcher_id))
+        .await
+    {
+        Ok(d) => d,
+        Err(_) => {
+            log::error!("A ConfigMap was found, but the Deployment was missing for Watcher {watcher_id}");
+            return Ok(reply::with_status(
+                reply::json(&json!({})),
+                StatusCode::NOT_FOUND,
+            ))
+        }
+    };
+
+    //
+    // // 3. Create Service/LoadBalancer
+    // log::debug!("Creating Service instance");
+    // let services: Api<Service> = Api::namespaced(client.clone(), &NAMESPACE);
+    // let svc = templates::build_service(&new_id, watcher.source.ingest_port);
+    // // TODO: Handle errors
+    // let _ = services.create(&pp, &svc).await.unwrap();
+    //
+    // watcher.status = Some(Status::Pending);
+    // watcher.source.ingest_ip = None;
+
+    let mut existing_watcher: Watcher =
+        serde_json::from_str(config_map.data.unwrap().get("watcher.json").unwrap()).unwrap();
+    let watcher_status = deployment.get_watcher_status();
+    if watcher_status != Status::Ready {
+        return Ok(reply::with_status(
+            reply::json(
+                &json!({"message": "The Watcher must be stopped before the upgrade can be applied"}),
+            ),
+            StatusCode::BAD_REQUEST,
+        ));
+    }
+    existing_watcher.status = Some(watcher_status);
+    existing_watcher.merge(payload_watcher);
+
+    /* *************************************** */
+
+    backend::stop_watcher(&k8s_client);
+    backend::start_watcher(&k8s_client);
+
+    // 1. Update ConfigMap
+    log::debug!("Updating ConfigMap instance");
+    let config_file_contents = serde_json::to_string(&existing_watcher).unwrap();
+    let config = templates::build_configmap(&watcher_id, &config_file_contents);
+    // TODO: Handle errors
+    let patch_params = PatchParams {
+        field_manager: Some("hawkeye_api".to_string()),
+        ..Default::default()
+    };
+    let patch = Patch::Merge(&config);
+    let config_maps: Api<ConfigMap> = Api::namespaced(k8s_client.clone(), &NAMESPACE);
+    let _ = config_maps
+        .patch(&configmap_name(&watcher_id), &patch_params, &patch)
+        .await
+        .unwrap();
+
+    // 2. Update Deployment with replicas=0
+    log::debug!("Updating Deployment instance");
+    let deploy = templates::build_deployment(&watcher_id, existing_watcher.source.ingest_port);
+    // TODO: Handle errors
+    let patch_params = PatchParams {
+        field_manager: Some("hawkeye_api".to_string()),
+        ..Default::default()
+    };
+    let patch = Patch::Merge(&deploy);
+    let deployments: Api<Deployment> = Api::namespaced(k8s_client.clone(), &NAMESPACE);
+    let _ = deployments
+        .patch(&deployment_name(&watcher_id), &patch_params, &patch)
+        .await
+        .unwrap();
+
+    // 3. Update Service/LoadBalancer
+    log::debug!("Updating Service instance");
+    let svc = templates::build_service(&watcher_id, existing_watcher.source.ingest_port);
+    // TODO: Handle errors
+    // let _ = services.create(&pp, &svc).await.unwrap();
+    let patch_params = PatchParams {
+        field_manager: Some("hawkeye_api".to_string()),
+        ..Default::default()
+    };
+    let patch = Patch::Merge(&svc);
+    let services: Api<Service> = Api::namespaced(k8s_client.clone(), &NAMESPACE);
+    let _ = services
+        .patch(&service_name(&watcher_id), &patch_params, &patch)
+        .await
+        .unwrap();
+
+    Ok(reply::with_status(
+        reply::json(&existing_watcher),
+        StatusCode::OK,
+    ))
+}
+
+pub async fn upgrade_watcher(
+    watcher_id: String,
+    client: Client,
+) -> Result<impl warp::Reply, Infallible> {
+    log::debug!("v1.upgrade_watcher: {}", watcher_id);
     let deployments: Api<Deployment> = Api::namespaced(client.clone(), &NAMESPACE);
-    let deployment = match deployments.get(&templates::deployment_name(&id)).await {
+    let deployment = match deployments
+        .get(&templates::deployment_name(&watcher_id))
+        .await
+    {
         Ok(d) => d,
         Err(_) => {
             return Ok(reply::with_status(
@@ -121,7 +256,7 @@ pub async fn upgrade_watcher(id: String, client: Client) -> Result<impl warp::Re
     // We use the ConfigMap as source of truth for what are the watchers we have
     let config_maps_client: Api<ConfigMap> = Api::namespaced(client.clone(), &NAMESPACE);
     let config_map = match config_maps_client
-        .get(&templates::configmap_name(&id))
+        .get(&templates::configmap_name(&watcher_id))
         .await
     {
         Ok(c) => c,
@@ -152,7 +287,7 @@ pub async fn upgrade_watcher(id: String, client: Client) -> Result<impl warp::Re
             "template": {
                 "spec": {
                     "containers": [
-                        container_spec(&id, watcher.source.ingest_port)
+                        container_spec(&watcher_id, watcher.source.ingest_port)
                     ]
                 }
             }
@@ -180,11 +315,14 @@ pub async fn upgrade_watcher(id: String, client: Client) -> Result<impl warp::Re
     }
 }
 
-pub async fn get_watcher(id: String, client: Client) -> Result<impl warp::Reply, Infallible> {
+pub async fn get_watcher(
+    watcher_id: String,
+    client: Client,
+) -> Result<impl warp::Reply, Infallible> {
     let deployments_client: Api<Deployment> = Api::namespaced(client.clone(), &NAMESPACE);
     // TODO: searching for a deployment could be a filter in this route
     let deployment = match deployments_client
-        .get(&templates::deployment_name(&id))
+        .get(&templates::deployment_name(&watcher_id))
         .await
     {
         Ok(d) => d,
@@ -199,7 +337,7 @@ pub async fn get_watcher(id: String, client: Client) -> Result<impl warp::Reply,
     // We use the ConfigMap as source of truth for what are the watchers we have
     let config_maps_client: Api<ConfigMap> = Api::namespaced(client.clone(), &NAMESPACE);
     let config_map = match config_maps_client
-        .get(&templates::configmap_name(&id))
+        .get(&templates::configmap_name(&watcher_id))
         .await
     {
         Ok(c) => c,
@@ -219,7 +357,7 @@ pub async fn get_watcher(id: String, client: Client) -> Result<impl warp::Reply,
         // Load more information why it's in pending status
         // We get the reason the container is waiting, if available
         let pods_client: Api<Pod> = Api::namespaced(client.clone(), &NAMESPACE);
-        let lp = ListParams::default().labels(&format!("app=hawkeye,watcher_id={}", id));
+        let lp = ListParams::default().labels(&format!("app=hawkeye,watcher_id={}", watcher_id));
         let pods = pods_client.list(&lp).await.unwrap();
         let status_description = pods
             .items
@@ -250,7 +388,7 @@ pub async fn get_watcher(id: String, client: Client) -> Result<impl warp::Reply,
         log::debug!("Getting ingest_ip from Service's LoadBalancer");
         let services: Api<Service> = Api::namespaced(client.clone(), &NAMESPACE);
         let service = services
-            .get_status(&templates::service_name(&id))
+            .get_status(&templates::service_name(&watcher_id))
             .await
             .unwrap();
         service
@@ -271,18 +409,24 @@ pub async fn get_watcher(id: String, client: Client) -> Result<impl warp::Reply,
     Ok(reply::with_status(reply::json(&w), StatusCode::OK))
 }
 
-pub async fn get_video_frame(id: String, client: Client) -> Result<impl warp::Reply, Infallible> {
+pub async fn get_video_frame(
+    watcher_id: String,
+    client: Client,
+) -> Result<impl warp::Reply, Infallible> {
     let mut resp = warp::reply::Response::new(Body::empty());
 
     // We use the ConfigMap as source of truth for what are the watchers we have
     let config_maps_client: Api<ConfigMap> = Api::namespaced(client.clone(), &NAMESPACE);
     let config_map = match config_maps_client
-        .get(&templates::configmap_name(&id))
+        .get(&templates::configmap_name(&watcher_id))
         .await
     {
         Ok(c) => c,
         Err(_) => {
-            log::debug!("ConfigMap object not found for this watcher: {}", id);
+            log::debug!(
+                "ConfigMap object not found for this watcher: {}",
+                watcher_id
+            );
             *resp.status_mut() = StatusCode::NOT_FOUND;
             return Ok(resp);
         }
@@ -292,7 +436,7 @@ pub async fn get_video_frame(id: String, client: Client) -> Result<impl warp::Re
 
     let deployments_client: Api<Deployment> = Api::namespaced(client.clone(), &NAMESPACE);
     let deployment = match deployments_client
-        .get(&templates::deployment_name(&id))
+        .get(&templates::deployment_name(&watcher_id))
         .await
     {
         Ok(d) => d,
@@ -307,7 +451,7 @@ pub async fn get_video_frame(id: String, client: Client) -> Result<impl warp::Re
         return Ok(resp);
     }
     let pods_client: Api<Pod> = Api::namespaced(client.clone(), &NAMESPACE);
-    let lp = ListParams::default().labels(&format!("app=hawkeye,watcher_id={}", id));
+    let lp = ListParams::default().labels(&format!("app=hawkeye,watcher_id={}", watcher_id));
     let pods = pods_client.list(&lp).await.unwrap();
     if let Some(pod_ip) = pods
         .items
@@ -363,40 +507,28 @@ pub async fn get_video_frame(id: String, client: Client) -> Result<impl warp::Re
 /// Start a Watcher worker by making sure there's a positive replica count for the Kubernetes
 /// deployment.
 pub async fn start_watcher(id: String, client: Client) -> Result<impl warp::Reply, Infallible> {
-    let deployments_client: Api<Deployment> = Api::namespaced(client.clone(), &NAMESPACE);
-
-    // Get the Kubernetes deployment for the Watcher.
-    // TODO: probably better to just get the scale
-    let deployment = match deployments_client
-        .get(&templates::deployment_name(&id))
-        .await
-    {
-        Ok(d) => d,
-        Err(_) => {
-            return Ok(reply::with_status(
-                reply::json(&json!({})),
-                StatusCode::NOT_FOUND,
-            ))
-        }
-    };
-
-    // Actions and guards based on the current Watcher status.
-    match deployment.get_watcher_status() {
-        Status::Running => Ok(reply::with_status(
+    match backend::start_watcher(&k8s_client) {
+        WatcherStartStatus::NotFound => Ok(reply::with_status(
+            reply::json(&json!({
+                "message": "Watcher can not be found."
+            })),
+            StatusCode::OK,
+        )),
+        WatcherStartStatus::AlreadyStopped => Ok(reply::with_status(
             // No op, already running!
             reply::json(&json!({
                 "message": "Watcher is already running"
             })),
             StatusCode::OK,
         )),
-        Status::Pending => Ok(reply::with_status(
+        WatcherStartStatus::CurrentlyUpdating => Ok(reply::with_status(
             // No op, committing other changes.
             reply::json(&json!({
                 "message": "Watcher is currently updating"
             })),
             StatusCode::CONFLICT,
         )),
-        Status::Ready => {
+        WatcherStartStatus::Ready => {
             // Start Watcher by setting Kubernetes deployment replicas=1
             let patch_params = PatchParams {
                 field_manager: Some("hawkeye_api".to_string()),
@@ -442,7 +574,7 @@ pub async fn start_watcher(id: String, client: Client) -> Result<impl warp::Repl
                 StatusCode::OK,
             ))
         }
-        Status::Error => Ok(reply::with_status(
+        WatcherStartStatus::InErrorState => Ok(reply::with_status(
             reply::json(&json!({
                 "message": "Watcher in error state cannot be set to running"
             })),
@@ -453,36 +585,31 @@ pub async fn start_watcher(id: String, client: Client) -> Result<impl warp::Repl
 
 /// Stop a Watcher worker by making sure there's a replica count of 0 for the Kubernetes
 /// deployment.
-pub async fn stop_watcher(id: String, client: Client) -> Result<impl warp::Reply, Infallible> {
-    let deployments_client: Api<Deployment> = Api::namespaced(client.clone(), &NAMESPACE);
-    // TODO: probably better to just get the scale
-    let deployment = match deployments_client
-        .get(&templates::deployment_name(&id))
-        .await
-    {
-        Ok(d) => d,
-        Err(_) => {
-            return Ok(reply::with_status(
-                reply::json(&json!({})),
-                StatusCode::NOT_FOUND,
-            ))
-        }
-    };
+pub async fn stop_watcher(
+    watcher_id: String,
+    k8s_client: Client,
+) -> Result<impl warp::Reply, Infallible> {
     // TODO: Set target_status to Ready
-    match deployment.get_watcher_status() {
-        Status::Ready => Ok(reply::with_status(
+    match backend::stop_watcher(&k8s_client) {
+        WatcherStopStatus::NotFound => Ok(reply::with_status(
+            reply::json(&json!({
+                "message": "Watcher can not be found."
+            })),
+            StatusCode::OK,
+        )),
+        WatcherStopStatus::AlreadyStopped => Ok(reply::with_status(
             reply::json(&json!({
                 "message": "Watcher is already stopped"
             })),
             StatusCode::OK,
         )),
-        Status::Pending => Ok(reply::with_status(
+        WatcherStopStatus::CurrentlyUpdating => Ok(reply::with_status(
             reply::json(&json!({
                 "message": "Watcher is currently updating"
             })),
             StatusCode::CONFLICT,
         )),
-        Status::Running => {
+        WatcherStopStatus::Stopping => {
             // Stop watcher / replicas to 0
             let patch_params = PatchParams {
                 field_manager: Some("hawkeye_api".to_string()),
@@ -527,7 +654,7 @@ pub async fn stop_watcher(id: String, client: Client) -> Result<impl warp::Reply
                 StatusCode::OK,
             ))
         }
-        Status::Error => Ok(reply::with_status(
+        WatcherStopStatus::InErrorState => Ok(reply::with_status(
             reply::json(&json!({
                 "message": "Watcher in error state cannot be set to stopped"
             })),
@@ -536,21 +663,27 @@ pub async fn stop_watcher(id: String, client: Client) -> Result<impl warp::Reply
     }
 }
 
-pub async fn delete_watcher(id: String, client: Client) -> Result<impl warp::Reply, Infallible> {
+pub async fn delete_watcher(
+    watcher_id: String,
+    client: Client,
+) -> Result<impl warp::Reply, Infallible> {
     let dp = DeleteParams::default();
 
     let deployments_client: Api<Deployment> = Api::namespaced(client.clone(), &NAMESPACE);
     let _ = deployments_client
-        .delete(&templates::deployment_name(&id), &dp)
+        .delete(&templates::deployment_name(&watcher_id), &dp)
         .await;
 
     let config_maps: Api<ConfigMap> = Api::namespaced(client.clone(), &NAMESPACE);
     let _ = config_maps
-        .delete(&templates::configmap_name(&id), &dp)
+        .delete(&templates::configmap_name(&watcher_id), &dp)
         .await;
 
     let services: Api<Service> = Api::namespaced(client, &NAMESPACE);
-    match services.delete(&templates::service_name(&id), &dp).await {
+    match services
+        .delete(&templates::service_name(&watcher_id), &dp)
+        .await
+    {
         Ok(_) => Ok(reply::with_status(
             reply::json(&json!({
                 "message": "Watcher has been deleted"
@@ -586,7 +719,7 @@ pub async fn healthcheck(client: Client) -> Result<impl warp::Reply, Infallible>
     }
 }
 
-trait WatcherStatus {
+pub trait WatcherStatus {
     fn get_watcher_status(&self) -> Status;
 }
 

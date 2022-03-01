@@ -3,6 +3,7 @@ mod config;
 mod filters;
 mod handlers;
 mod templates;
+mod backend;
 
 use hawkeye_core::utils::maybe_bootstrap_sentry;
 use kube::Client;
