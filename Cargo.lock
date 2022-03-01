@@ -223,7 +223,6 @@ dependencies = [
  "num-integer",
  "num-traits",
  "serde",
- "time 0.1.44",
  "winapi 0.3.9",
 ]
 
@@ -1578,9 +1577,9 @@ dependencies = [
 
 [[package]]
 name = "kube"
-version = "0.67.0"
+version = "0.69.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "067efafecb445fc68e1f3071880fcf3eb9ca09a16115432033a0f4c1e5ad60ef"
+checksum = "86835e9147615457c1edc2b11c723acd1d21372e9cefa80a9d2742f6d69042d0"
 dependencies = [
  "k8s-openapi",
  "kube-client",
@@ -1590,9 +1589,9 @@ dependencies = [
 
 [[package]]
 name = "kube-client"
-version = "0.67.0"
+version = "0.69.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4ec03dc0f21b475b32fe7768e1c1448a490c0400309b4358a68bee804cdc0701"
+checksum = "71f8aa916ee8290fbd0af76b3a28093a8786fccb6286902095a5243484447971"
 dependencies = [
  "base64",
  "bytes 1.1.0",
@@ -1626,9 +1625,9 @@ dependencies = [
 
 [[package]]
 name = "kube-core"
-version = "0.67.0"
+version = "0.69.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3d82994f9c9b0e13367db9f9b98b30c798da531d4ea2c4c5bebc22e45ba8c67c"
+checksum = "da41f98f213796a68fcd4510c88b5fd36de131c1ea30d152474c3f2e1bef1a72"
 dependencies = [
  "chrono",
  "form_urlencoded",
@@ -1643,9 +1642,9 @@ dependencies = [
 
 [[package]]
 name = "kube-runtime"
-version = "0.67.0"
+version = "0.69.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "023a562b3e722d3932654fa6be3772184d73699ad44d3161853874bd79452999"
+checksum = "32e8bf2258850dbc0a062b561656a1d7020fa8040d552e149f0a0361f0d6794e"
 dependencies = [
  "ahash",
  "backoff",
@@ -3288,17 +3287,6 @@ dependencies = [
  "jpeg-decoder",
  "miniz_oxide 0.4.4",
  "weezl",
-]
-
-[[package]]
-name = "time"
-version = "0.1.44"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6db9e6914ab8b1ae1c260a4ae7a49b6c5611b40328a735b21862567685e73255"
-dependencies = [
- "libc",
- "wasi 0.10.0+wasi-snapshot-preview1",
- "winapi 0.3.9",
 ]
 
 [[package]]
