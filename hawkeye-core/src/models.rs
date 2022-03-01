@@ -4,8 +4,43 @@ use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 use std::collections::HashMap;
 use std::ffi::OsStr;
+use std::fmt;
 use std::path::Path;
 use url::Url;
+
+const TAG_MAX_KEY_LENGTH: usize = 40;
+const TAG_MAX_VALUE_LENGTH: usize = 63;
+
+/// A mixin for "tags" functionality since most entities will should have tagging capability.
+pub trait ApiTags {
+    fn validate_tags(&self, tags: Option<&HashMap<String, String>>) -> Result<()> {
+        if tags.is_none() {
+            // No tags were supplied, so nothing to validate.
+            return Ok(());
+        }
+
+        let tags_ref = tags.as_ref().unwrap();
+        if tags_ref
+            .keys()
+            .any(|key| key.is_empty() || key.len() > TAG_MAX_KEY_LENGTH)
+        {
+            Err(eyre!(format!(
+                "Tag keys must be between 1 and {} characters long.",
+                TAG_MAX_KEY_LENGTH
+            )))
+        } else if tags_ref
+            .values()
+            .any(|value| value.is_empty() || value.len() > TAG_MAX_VALUE_LENGTH)
+        {
+            Err(eyre!(format!(
+                "Tag values must be between 1 and {} characters long.",
+                TAG_MAX_VALUE_LENGTH
+            )))
+        } else {
+            Ok(())
+        }
+    }
+}
 
 #[skip_serializing_none]
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
@@ -16,17 +51,23 @@ pub struct Watcher {
     pub status_description: Option<String>,
     pub source: Source,
     pub transitions: Vec<Transition>,
+    pub tags: Option<HashMap<String, String>>,
 }
 
 impl Watcher {
     pub fn is_valid(&self) -> Result<()> {
-        self.transitions
-            .iter()
-            .try_for_each(|t| t.is_valid())
-            // Validate the source.
-            .and(self.source.is_valid())
+        self.source
+            .is_valid()
+            .and(self.validate_transitions())
+            .and(self.validate_tags(self.tags.as_ref()))
+    }
+
+    fn validate_transitions(&self) -> Result<()> {
+        self.transitions.iter().try_for_each(|t| t.is_valid())
     }
 }
+
+impl ApiTags for Watcher {}
 
 #[derive(Serialize, Deserialize, Copy, Clone, Debug, Eq, PartialEq)]
 #[serde(rename_all = "lowercase")]
@@ -35,6 +76,12 @@ pub enum Status {
     Pending,
     Ready,
     Error,
+}
+
+impl fmt::Display for Status {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
 }
 
 #[skip_serializing_none]
@@ -274,8 +321,9 @@ mod tests {
                             timeout: Some(10),
                         })
                     ]
-                }
-            ]
+                },
+            ],
+            tags: Some(HashMap::from([("foo".to_string(), "bar".to_string())])),
         }
     }
 
@@ -349,5 +397,58 @@ mod tests {
             serde_json::from_str(watcher_json.as_str()).unwrap();
 
         assert_eq!(watcher_as_value, fixture);
+    }
+
+    #[test]
+    fn validate_valid_tags() {
+        let tags = HashMap::from([
+            ("foo".to_string(), "bar".to_string()),
+            ("hawk".to_string(), "eye".to_string()),
+        ]);
+        let result = get_watcher().validate_tags(Some(&tags));
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn validate_tags_no_chars_key_should_error() {
+        let tags = HashMap::from([("".to_string(), "uhoh".to_string())]);
+        let result = get_watcher().validate_tags(Some(&tags));
+        assert!(result.is_err());
+        assert!(format!("{:?}", result).contains("Tag keys"));
+        assert!(format!("{:?}", result).contains("characters long"));
+    }
+
+    #[test]
+    fn validate_tags_key_too_long_for_k8s_labels_should_error() {
+        let tags = HashMap::from([(
+            (0..TAG_MAX_KEY_LENGTH + 1).map(|_| "a").collect::<String>(),
+            "uhoh".to_string(),
+        )]);
+        let result = get_watcher().validate_tags(Some(&tags));
+        assert!(result.is_err());
+        assert!(format!("{:?}", result).contains("Tag keys"));
+        assert!(format!("{:?}", result).contains("characters long"));
+    }
+
+    #[test]
+    fn validate_tags_no_chars_value_should_error() {
+        let tags = HashMap::from([("uhoh".to_string(), "".to_string())]);
+        let result = get_watcher().validate_tags(Some(&tags));
+        assert!(result.is_err());
+        assert!(format!("{:?}", result).contains("Tag values"));
+        assert!(format!("{:?}", result).contains("characters long"));
+    }
+
+    #[test]
+    fn validate_tags_value_too_long_should_error() {
+        let tags = HashMap::from([(
+            "uhoh".to_string(),
+            (0..TAG_MAX_VALUE_LENGTH + 1)
+                .map(|_| "a")
+                .collect::<String>(),
+        )]);
+        let result = get_watcher().validate_tags(Some(&tags));
+        assert!(format!("{:?}", result).contains("Tag values"));
+        assert!(format!("{:?}", result).contains("characters long"));
     }
 }

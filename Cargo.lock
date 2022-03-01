@@ -1109,7 +1109,7 @@ dependencies = [
 
 [[package]]
 name = "hawkeye-api"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "eyre",
@@ -1130,7 +1130,7 @@ dependencies = [
 
 [[package]]
 name = "hawkeye-core"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "color-eyre",
  "lazy_static",
@@ -1147,7 +1147,7 @@ dependencies = [
 
 [[package]]
 name = "hawkeye-worker"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "color-eyre",
  "concread",
@@ -3416,17 +3416,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tokio-rustls"
-version = "0.22.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bc6844de72e57df1980054b38be3a9f4702aba4858be64dd700181a8a6d0e1b6"
-dependencies = [
- "rustls",
- "tokio 1.16.1",
- "webpki",
-]
-
-[[package]]
 name = "tokio-stream"
 version = "0.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3774,7 +3763,6 @@ dependencies = [
  "serde_json",
  "serde_urlencoded",
  "tokio 1.16.1",
- "tokio-rustls",
  "tokio-stream",
  "tokio-util 0.6.9",
  "tower-service",

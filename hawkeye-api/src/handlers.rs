@@ -78,21 +78,22 @@ pub async fn create_watcher(
     log::debug!("Creating ConfigMap instance");
     let config_maps: Api<ConfigMap> = Api::namespaced(client.clone(), &NAMESPACE);
     let config_file_contents = serde_json::to_string(&watcher).unwrap();
-    let config = templates::build_configmap(&new_id, &config_file_contents);
+    let config = templates::build_configmap(&new_id, &config_file_contents, watcher.tags.as_ref());
     // TODO: Handle errors
     let _ = config_maps.create(&pp, &config).await.unwrap();
 
     // 2. Create Deployment with replicas=0
     log::debug!("Creating Deployment instance");
     let deployments: Api<Deployment> = Api::namespaced(client.clone(), &NAMESPACE);
-    let deploy = templates::build_deployment(&new_id, watcher.source.ingest_port);
+    let deploy =
+        templates::build_deployment(&new_id, watcher.source.ingest_port, watcher.tags.as_ref());
     // TODO: Handle errors
     let _ = deployments.create(&pp, &deploy).await.unwrap();
 
     // 3. Create Service/LoadBalancer
     log::debug!("Creating Service instance");
     let services: Api<Service> = Api::namespaced(client.clone(), &NAMESPACE);
-    let svc = templates::build_service(&new_id, watcher.source.ingest_port);
+    let svc = templates::build_service(&new_id, watcher.source.ingest_port, watcher.tags.as_ref());
     // TODO: Handle errors
     let _ = services.create(&pp, &svc).await.unwrap();
 
