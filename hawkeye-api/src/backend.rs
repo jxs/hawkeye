@@ -7,6 +7,8 @@ use serde::Deserialize;
 use serde_json::json;
 use thiserror::Error;
 
+const FIELD_MGR: &str = "hawkeye_api";
+
 #[derive(Debug, Deserialize, Error)]
 pub enum WatcherStartStatus {
     #[error("Watcher is already running.")]
@@ -35,15 +37,74 @@ pub enum WatcherStopStatus {
     NotFound, // 404
 }
 
-pub async fn start_watcher(k8s_client: &kube::Client, watcher_id: &str) -> WatcherStartStatus {
+/// Get a Watcher's Kubernetes deployment.
+async fn get_watcher_deployment(
+    k8s_client: &kube::Client,
+    watcher_id: &str,
+) -> kube::Result<Deployment> {
     let deployments_client: Api<Deployment> =
         Api::namespaced(k8s_client.clone(), &config::NAMESPACE);
-    let deployment = match deployments_client
+    deployments_client
         .get(&templates::deployment_name(watcher_id))
         .await
-    {
+}
+
+/// Scale a Watcher's Kubernetes deployment by altering the number of replicas. Great for turning down to 0.
+async fn scale_watcher_deployment(k8s_client: &kube::Client, watcher_id: &str, replica_count: u16) {
+    let patch_params = PatchParams {
+        field_manager: Some(FIELD_MGR.to_owned()),
+        ..Default::default()
+    };
+    let deployment_scale_json = json!({
+        "apiVersion": "autoscaling/v1",
+        "spec": {"replicas": replica_count},
+    });
+    let deployments_client: Api<Deployment> =
+        Api::namespaced(k8s_client.clone(), &config::NAMESPACE);
+    deployments_client
+        .patch_scale(
+            &templates::deployment_name(watcher_id),
+            &patch_params,
+            &Patch::Merge(&deployment_scale_json),
+        )
+        .await
+        .unwrap();
+}
+
+/// Update a Watcher's status to indicate it should be running or not.
+async fn update_watcher_deployment_target_status(
+    k8s_client: &kube::Client,
+    watcher_id: &str,
+    status: Status,
+) {
+    let patch_params = PatchParams {
+        field_manager: Some(FIELD_MGR.to_owned()),
+        ..Default::default()
+    };
+    let status_label_json = json!({
+        "apiVersion": "apps/v1",
+        "metadata": {
+            "labels": {
+                "target_status": status,
+            }
+        }
+    });
+    let deployments_client: Api<Deployment> =
+        Api::namespaced(k8s_client.clone(), &config::NAMESPACE);
+    deployments_client
+        .patch(
+            &templates::deployment_name(watcher_id),
+            &patch_params,
+            &Patch::Merge(status_label_json),
+        )
+        .await
+        .unwrap();
+}
+
+pub async fn start_watcher(k8s_client: &kube::Client, watcher_id: &str) -> WatcherStartStatus {
+    let deployment = match get_watcher_deployment(k8s_client, watcher_id).await {
         Ok(d) => d,
-        Err(_) => return WatcherStartStatus::NotFound,
+        _ => return WatcherStartStatus::NotFound,
     };
 
     // Actions and guards based on the current Watcher status.
@@ -52,59 +113,17 @@ pub async fn start_watcher(k8s_client: &kube::Client, watcher_id: &str) -> Watch
         Status::Pending => WatcherStartStatus::CurrentlyUpdating,
         Status::Error => WatcherStartStatus::InErrorState,
         Status::Ready => {
-            // Start Watcher by setting Kubernetes deployment replicas=1
-            let patch_params = PatchParams {
-                field_manager: Some("hawkeye_api".to_string()),
-                ..Default::default()
-            };
-
-            // Set Kubernetes deployment replica=1 via patch.
-            let deployment_scale_json = json!({
-                "apiVersion": "autoscaling/v1",
-                "spec": { "replicas": 1_u16 },
-            });
-            deployments_client
-                .patch_scale(
-                    deployment.metadata.name.as_ref().unwrap(),
-                    &patch_params,
-                    &Patch::Merge(&deployment_scale_json),
-                )
-                .await
-                .unwrap();
-
-            // Update the status of the Watcher to indicate it should be running.
-            let status_label_json = json!({
-                "apiVersion": "apps/v1",
-                "metadata": {
-                    "labels": {
-                        "target_status": Status::Running,
-                    }
-                }
-            });
-            deployments_client
-                .patch(
-                    deployment.metadata.name.as_ref().unwrap(),
-                    &patch_params,
-                    &Patch::Merge(status_label_json),
-                )
-                .await
-                .unwrap();
-
+            scale_watcher_deployment(k8s_client, watcher_id, 1_u16).await;
+            update_watcher_deployment_target_status(k8s_client, watcher_id, Status::Running).await;
             WatcherStartStatus::Starting
         }
     }
 }
 
 pub async fn stop_watcher(k8s_client: &kube::Client, watcher_id: &str) -> WatcherStopStatus {
-    let deployments_client: Api<Deployment> =
-        Api::namespaced(k8s_client.clone(), &config::NAMESPACE);
-    // TODO: probably better to just get the scale
-    let deployment = match deployments_client
-        .get(&templates::deployment_name(watcher_id))
-        .await
-    {
+    let deployment = match get_watcher_deployment(k8s_client, watcher_id).await {
         Ok(d) => d,
-        Err(_) => return WatcherStopStatus::NotFound,
+        _ => return WatcherStopStatus::NotFound,
     };
 
     match get_watcher_status(&deployment) {
@@ -112,43 +131,8 @@ pub async fn stop_watcher(k8s_client: &kube::Client, watcher_id: &str) -> Watche
         Status::Pending => WatcherStopStatus::CurrentlyUpdating,
         Status::Error => WatcherStopStatus::InErrorState,
         Status::Running => {
-            // Stop watcher / replicas to 0
-            let patch_params = PatchParams {
-                field_manager: Some("hawkeye_api".to_string()),
-                ..Default::default()
-            };
-
-            let deployment_scale_json = json!({
-                "apiVersion": "autoscaling/v1",
-                "spec": { "replicas": 0_u16 },
-            });
-            deployments_client
-                .patch_scale(
-                    deployment.metadata.name.as_ref().unwrap(),
-                    &patch_params,
-                    &Patch::Merge(&deployment_scale_json),
-                )
-                .await
-                .unwrap();
-
-            // Update the status of the Watcher to indicate it should be running.
-            let status_label_json = json!({
-                "apiVersion": "apps/v1",
-                "metadata": {
-                    "labels": {
-                        "target_status": Status::Ready,
-                    }
-                }
-            });
-            deployments_client
-                .patch(
-                    deployment.metadata.name.as_ref().unwrap(),
-                    &patch_params,
-                    &Patch::Merge(status_label_json),
-                )
-                .await
-                .unwrap();
-
+            scale_watcher_deployment(k8s_client, watcher_id, 0_u16).await;
+            update_watcher_deployment_target_status(k8s_client, watcher_id, Status::Ready).await;
             WatcherStopStatus::Stopping
         }
     }
