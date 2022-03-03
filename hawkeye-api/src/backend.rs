@@ -1,6 +1,7 @@
 use crate::{config, templates};
-use hawkeye_core::models::Status;
+use hawkeye_core::models::{Status, Watcher};
 use k8s_openapi::api::apps::v1::Deployment;
+use k8s_openapi::api::core::v1::{ConfigMap, Service};
 use kube::api::{Patch, PatchParams};
 use kube::Api;
 use serde::Deserialize;
@@ -37,8 +38,20 @@ pub enum WatcherStopStatus {
     NotFound, // 404
 }
 
+/// Get a Watcher's Kubernetes ConfigMap. It represents a source of truth for Watcher config.
+pub async fn get_watcher_configmap(
+    k8s_client: &kube::Client,
+    watcher_id: &str,
+) -> kube::Result<ConfigMap> {
+    let config_maps_client: Api<ConfigMap> =
+        Api::namespaced(k8s_client.clone(), &config::NAMESPACE);
+    config_maps_client
+        .get(&templates::configmap_name(watcher_id))
+        .await
+}
+
 /// Get a Watcher's Kubernetes deployment.
-async fn get_watcher_deployment(
+pub async fn get_watcher_deployment(
     k8s_client: &kube::Client,
     watcher_id: &str,
 ) -> kube::Result<Deployment> {
@@ -50,7 +63,11 @@ async fn get_watcher_deployment(
 }
 
 /// Scale a Watcher's Kubernetes deployment by altering the number of replicas. Great for turning down to 0.
-async fn scale_watcher_deployment(k8s_client: &kube::Client, watcher_id: &str, replica_count: u16) {
+pub async fn scale_watcher_deployment(
+    k8s_client: &kube::Client,
+    watcher_id: &str,
+    replica_count: u16,
+) {
     let patch_params = PatchParams {
         field_manager: Some(FIELD_MGR.to_owned()),
         ..Default::default()
@@ -72,7 +89,7 @@ async fn scale_watcher_deployment(k8s_client: &kube::Client, watcher_id: &str, r
 }
 
 /// Update a Watcher's status to indicate it should be running or not.
-async fn update_watcher_deployment_target_status(
+pub async fn update_watcher_deployment_target_status(
     k8s_client: &kube::Client,
     watcher_id: &str,
     status: Status,
@@ -101,7 +118,9 @@ async fn update_watcher_deployment_target_status(
         .unwrap();
 }
 
+/// Start a Watcher by settings it's replica count to 1.
 pub async fn start_watcher(k8s_client: &kube::Client, watcher_id: &str) -> WatcherStartStatus {
+    log::debug!("Stopping Watcher {}", watcher_id);
     let deployment = match get_watcher_deployment(k8s_client, watcher_id).await {
         Ok(d) => d,
         _ => return WatcherStartStatus::NotFound,
@@ -120,7 +139,9 @@ pub async fn start_watcher(k8s_client: &kube::Client, watcher_id: &str) -> Watch
     }
 }
 
+/// Stop a Watcher by settings it's replica count to 0.
 pub async fn stop_watcher(k8s_client: &kube::Client, watcher_id: &str) -> WatcherStopStatus {
+    log::debug!("Stopping Watcher {}", watcher_id);
     let deployment = match get_watcher_deployment(k8s_client, watcher_id).await {
         Ok(d) => d,
         _ => return WatcherStopStatus::NotFound,
@@ -179,4 +200,84 @@ fn get_watcher_status(deployment: &Deployment) -> Status {
     } else {
         Status::Error
     }
+}
+
+/// Update a Watcher's Kubernetes ConfigMap.
+pub async fn update_watcher_configmap(
+    k8s_client: &kube::Client,
+    watcher: &Watcher,
+) -> kube::Result<ConfigMap> {
+    log::debug!("Updating ConfigMap instance");
+    let config_file_contents = serde_json::to_string(&watcher).unwrap();
+    let config = templates::build_configmap(
+        &watcher.id.as_ref().unwrap(),
+        &config_file_contents,
+        watcher.tags.as_ref(),
+    );
+    let patch_params = PatchParams {
+        field_manager: Some(FIELD_MGR.to_string()),
+        ..Default::default()
+    };
+    let patch = Patch::Merge(&config);
+    let config_maps: Api<ConfigMap> = Api::namespaced(k8s_client.clone(), &config::NAMESPACE);
+    config_maps
+        .patch(
+            &templates::configmap_name(&watcher.id.as_ref().unwrap()),
+            &patch_params,
+            &patch,
+        )
+        .await
+}
+
+pub async fn update_watcher_deployment(
+    k8s_client: &kube::Client,
+    watcher: &Watcher,
+) -> kube::Result<Deployment> {
+    // 2. Update Deployment with replicas=0
+    log::debug!("Updating Deployment instance");
+    let deploy = templates::build_deployment(
+        &watcher.id.as_ref().unwrap(),
+        watcher.source.ingest_port,
+        watcher.tags.as_ref(),
+    );
+    let patch_params = PatchParams {
+        field_manager: Some(FIELD_MGR.to_string()),
+        ..Default::default()
+    };
+    let patch = Patch::Merge(&deploy);
+    let deployments: Api<Deployment> = Api::namespaced(k8s_client.clone(), &config::NAMESPACE);
+    deployments
+        .patch(
+            &templates::deployment_name(&watcher.id.as_ref().unwrap()),
+            &patch_params,
+            &patch,
+        )
+        .await
+}
+
+pub async fn update_watcher_service(
+    k8s_client: &kube::Client,
+    watcher: &Watcher,
+) -> kube::Result<Service> {
+    log::debug!("Updating Service instance");
+    let svc = templates::build_service(
+        &watcher.id.as_ref().unwrap(),
+        watcher.source.ingest_port,
+        watcher.tags.as_ref(),
+    );
+    // TODO: Handle errors
+    // let _ = services.create(&pp, &svc).await.unwrap();
+    let patch_params = PatchParams {
+        field_manager: Some("hawkeye_api".to_string()),
+        ..Default::default()
+    };
+    let patch = Patch::Merge(&svc);
+    let services: Api<Service> = Api::namespaced(k8s_client.clone(), &config::NAMESPACE);
+    services
+        .patch(
+            &templates::service_name(&watcher.id.as_ref().unwrap()),
+            &patch_params,
+            &patch,
+        )
+        .await
 }

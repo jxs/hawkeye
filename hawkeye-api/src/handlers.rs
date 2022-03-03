@@ -1,7 +1,7 @@
 use crate::backend::{WatcherStartStatus, WatcherStopStatus};
 use crate::config::{CALL_WATCHER_TIMEOUT, NAMESPACE};
 use crate::filters::ErrorResponse;
-use crate::templates::{configmap_name, container_spec, deployment_name, service_name};
+use crate::templates::container_spec;
 use crate::{backend, config, templates};
 use hawkeye_core::models::{Status, Watcher};
 use k8s_openapi::api::apps::v1::Deployment;
@@ -122,14 +122,8 @@ pub async fn update_watcher(
         ));
     }
 
-    // We use the ConfigMap as source of truth for what are the watchers we have
-    let config_maps_client: Api<ConfigMap> =
-        Api::namespaced(k8s_client.clone(), &config::NAMESPACE);
-    let config_map = match config_maps_client
-        .get(&templates::configmap_name(&watcher_id))
-        .await
-    {
-        Ok(c) => c,
+    let config_map = match backend::get_watcher_configmap(&k8s_client, &watcher_id).await {
+        Ok(cm) => cm,
         Err(_) => {
             return Ok(reply::with_status(
                 reply::json(&json!({})),
@@ -138,15 +132,11 @@ pub async fn update_watcher(
         }
     };
 
-    let deployments: Api<Deployment> = Api::namespaced(k8s_client.clone(), &config::NAMESPACE);
-    let deployment = match deployments
-        .get(&templates::deployment_name(&watcher_id))
-        .await
-    {
+    let deployment = match backend::get_watcher_deployment(&k8s_client, &watcher_id).await {
         Ok(d) => d,
         Err(_) => {
             log::error!(
-                "A ConfigMap was found, but the Deployment was missing for Watcher {watcher_id}"
+                "A ConfigMap was found, but the Deployment was missing for Watcher {watcher_id}. Odd."
             );
             return Ok(reply::with_status(
                 reply::json(&json!({})),
@@ -154,17 +144,6 @@ pub async fn update_watcher(
             ));
         }
     };
-
-    //
-    // // 3. Create Service/LoadBalancer
-    // log::debug!("Creating Service instance");
-    // let services: Api<Service> = Api::namespaced(client.clone(), &NAMESPACE);
-    // let svc = templates::build_service(&new_id, watcher.source.ingest_port);
-    // // TODO: Handle errors
-    // let _ = services.create(&pp, &svc).await.unwrap();
-    //
-    // watcher.status = Some(Status::Pending);
-    // watcher.source.ingest_ip = None;
 
     let mut existing_watcher: Watcher =
         serde_json::from_str(config_map.data.unwrap().get("watcher.json").unwrap()).unwrap();
@@ -180,70 +159,12 @@ pub async fn update_watcher(
     existing_watcher.status = Some(watcher_status);
     existing_watcher.merge(payload_watcher);
 
-    /* *************************************** */
-
     // TODO: handle async? result? errors?
     backend::stop_watcher(&k8s_client, existing_watcher.id.as_ref().unwrap()).await;
     backend::start_watcher(&k8s_client, existing_watcher.id.as_ref().unwrap()).await;
-
-    // 1. Update ConfigMap
-    log::debug!("Updating ConfigMap instance");
-    let config_file_contents = serde_json::to_string(&existing_watcher).unwrap();
-    let config = templates::build_configmap(
-        &watcher_id,
-        &config_file_contents,
-        existing_watcher.tags.as_ref(),
-    );
-    // TODO: Handle errors
-    let patch_params = PatchParams {
-        field_manager: Some("hawkeye_api".to_string()),
-        ..Default::default()
-    };
-    let patch = Patch::Merge(&config);
-    let config_maps: Api<ConfigMap> = Api::namespaced(k8s_client.clone(), &NAMESPACE);
-    let _ = config_maps
-        .patch(&configmap_name(&watcher_id), &patch_params, &patch)
-        .await
-        .unwrap();
-
-    // 2. Update Deployment with replicas=0
-    log::debug!("Updating Deployment instance");
-    let deploy = templates::build_deployment(
-        &watcher_id,
-        existing_watcher.source.ingest_port,
-        existing_watcher.tags.as_ref(),
-    );
-    // TODO: Handle errors
-    let patch_params = PatchParams {
-        field_manager: Some("hawkeye_api".to_string()),
-        ..Default::default()
-    };
-    let patch = Patch::Merge(&deploy);
-    let deployments: Api<Deployment> = Api::namespaced(k8s_client.clone(), &NAMESPACE);
-    let _ = deployments
-        .patch(&deployment_name(&watcher_id), &patch_params, &patch)
-        .await
-        .unwrap();
-
-    // 3. Update Service/LoadBalancer
-    log::debug!("Updating Service instance");
-    let svc = templates::build_service(
-        &watcher_id,
-        existing_watcher.source.ingest_port,
-        existing_watcher.tags.as_ref(),
-    );
-    // TODO: Handle errors
-    // let _ = services.create(&pp, &svc).await.unwrap();
-    let patch_params = PatchParams {
-        field_manager: Some("hawkeye_api".to_string()),
-        ..Default::default()
-    };
-    let patch = Patch::Merge(&svc);
-    let services: Api<Service> = Api::namespaced(k8s_client.clone(), &NAMESPACE);
-    let _ = services
-        .patch(&service_name(&watcher_id), &patch_params, &patch)
-        .await
-        .unwrap();
+    let _ = backend::update_watcher_configmap(&k8s_client, &existing_watcher).await;
+    let _ = backend::update_watcher_deployment(&k8s_client, &existing_watcher).await;
+    let _ = backend::update_watcher_service(&k8s_client, &existing_watcher).await;
 
     Ok(reply::with_status(
         reply::json(&existing_watcher),
