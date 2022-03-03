@@ -147,24 +147,16 @@ pub async fn update_watcher(
 
     let mut existing_watcher: Watcher =
         serde_json::from_str(config_map.data.unwrap().get("watcher.json").unwrap()).unwrap();
-    let watcher_status = deployment.get_watcher_status();
-    if watcher_status != Status::Ready {
-        return Ok(reply::with_status(
-            reply::json(
-                &json!({"message": "The Watcher must be stopped before the upgrade can be applied"}),
-            ),
-            StatusCode::BAD_REQUEST,
-        ));
-    }
-    existing_watcher.status = Some(watcher_status);
     existing_watcher.merge(payload_watcher);
 
-    // TODO: handle async? result? errors?
+    let (_, _, _) = tokio::join!(
+        backend::update_watcher_configmap(&k8s_client, &existing_watcher),
+        backend::update_watcher_deployment(&k8s_client, &existing_watcher),
+        backend::update_watcher_service(&k8s_client, &existing_watcher),
+    );
+
     backend::stop_watcher(&k8s_client, existing_watcher.id.as_ref().unwrap()).await;
     backend::start_watcher(&k8s_client, existing_watcher.id.as_ref().unwrap()).await;
-    let _ = backend::update_watcher_configmap(&k8s_client, &existing_watcher).await;
-    let _ = backend::update_watcher_deployment(&k8s_client, &existing_watcher).await;
-    let _ = backend::update_watcher_service(&k8s_client, &existing_watcher).await;
 
     Ok(reply::with_status(
         reply::json(&existing_watcher),

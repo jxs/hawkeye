@@ -120,7 +120,7 @@ pub async fn update_watcher_deployment_target_status(
 
 /// Start a Watcher by settings it's replica count to 1.
 pub async fn start_watcher(k8s_client: &kube::Client, watcher_id: &str) -> WatcherStartStatus {
-    log::debug!("Stopping Watcher {}", watcher_id);
+    log::debug!("Starting Watcher {}", watcher_id);
     let deployment = match get_watcher_deployment(k8s_client, watcher_id).await {
         Ok(d) => d,
         _ => return WatcherStartStatus::NotFound,
