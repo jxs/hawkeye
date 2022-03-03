@@ -132,7 +132,7 @@ pub async fn update_watcher(
         }
     };
 
-    let deployment = match backend::get_watcher_deployment(&k8s_client, &watcher_id).await {
+    match backend::get_watcher_deployment(&k8s_client, &watcher_id).await {
         Ok(d) => d,
         Err(_) => {
             log::error!(

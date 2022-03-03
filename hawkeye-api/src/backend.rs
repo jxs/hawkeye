@@ -210,7 +210,7 @@ pub async fn update_watcher_configmap(
     log::debug!("Updating ConfigMap instance");
     let config_file_contents = serde_json::to_string(&watcher).unwrap();
     let config = templates::build_configmap(
-        &watcher.id.as_ref().unwrap(),
+        watcher.id.as_ref().unwrap(),
         &config_file_contents,
         watcher.tags.as_ref(),
     );
@@ -222,7 +222,7 @@ pub async fn update_watcher_configmap(
     let config_maps: Api<ConfigMap> = Api::namespaced(k8s_client.clone(), &config::NAMESPACE);
     config_maps
         .patch(
-            &templates::configmap_name(&watcher.id.as_ref().unwrap()),
+            &templates::configmap_name(watcher.id.as_ref().unwrap()),
             &patch_params,
             &patch,
         )
@@ -236,7 +236,7 @@ pub async fn update_watcher_deployment(
     // 2. Update Deployment with replicas=0
     log::debug!("Updating Deployment instance");
     let deploy = templates::build_deployment(
-        &watcher.id.as_ref().unwrap(),
+        watcher.id.as_ref().unwrap(),
         watcher.source.ingest_port,
         watcher.tags.as_ref(),
     );
@@ -248,7 +248,7 @@ pub async fn update_watcher_deployment(
     let deployments: Api<Deployment> = Api::namespaced(k8s_client.clone(), &config::NAMESPACE);
     deployments
         .patch(
-            &templates::deployment_name(&watcher.id.as_ref().unwrap()),
+            &templates::deployment_name(watcher.id.as_ref().unwrap()),
             &patch_params,
             &patch,
         )
@@ -261,7 +261,7 @@ pub async fn update_watcher_service(
 ) -> kube::Result<Service> {
     log::debug!("Updating Service instance");
     let svc = templates::build_service(
-        &watcher.id.as_ref().unwrap(),
+        watcher.id.as_ref().unwrap(),
         watcher.source.ingest_port,
         watcher.tags.as_ref(),
     );
@@ -275,7 +275,7 @@ pub async fn update_watcher_service(
     let services: Api<Service> = Api::namespaced(k8s_client.clone(), &config::NAMESPACE);
     services
         .patch(
-            &templates::service_name(&watcher.id.as_ref().unwrap()),
+            &templates::service_name(watcher.id.as_ref().unwrap()),
             &patch_params,
             &patch,
         )
