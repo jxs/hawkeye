@@ -1,4 +1,4 @@
-use crate::backend::{WatcherStartStatus, WatcherStopStatus};
+use crate::backend::{get_watcher_deployment, WatcherStartStatus, WatcherStopStatus};
 use crate::config::{CALL_WATCHER_TIMEOUT, NAMESPACE};
 use crate::filters::ErrorResponse;
 use crate::templates::container_spec;
@@ -132,7 +132,7 @@ pub async fn update_watcher(
         }
     };
 
-    match backend::get_watcher_deployment(&k8s_client, &watcher_id).await {
+    let deployment = match backend::get_watcher_deployment(&k8s_client, &watcher_id).await {
         Ok(d) => d,
         Err(_) => {
             log::error!(
@@ -157,6 +157,7 @@ pub async fn update_watcher(
 
     backend::stop_watcher(&k8s_client, existing_watcher.id.as_ref().unwrap()).await;
     backend::start_watcher(&k8s_client, existing_watcher.id.as_ref().unwrap()).await;
+    existing_watcher.status = Some(deployment.get_watcher_status());
 
     Ok(reply::with_status(
         reply::json(&existing_watcher),
