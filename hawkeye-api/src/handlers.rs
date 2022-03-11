@@ -1,4 +1,4 @@
-use crate::backend::{get_watcher_deployment, WatcherStartStatus, WatcherStopStatus};
+use crate::backend::{WatcherStartStatus, WatcherStopStatus};
 use crate::config::{CALL_WATCHER_TIMEOUT, NAMESPACE};
 use crate::filters::ErrorResponse;
 use crate::templates::container_spec;
