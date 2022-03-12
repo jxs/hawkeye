@@ -6,7 +6,6 @@ use std::collections::HashMap;
 use std::ffi::OsStr;
 use std::fmt;
 use std::path::Path;
-use std::str::FromStr;
 use url::Url;
 
 const TAG_MAX_KEY_LENGTH: usize = 40;
@@ -55,14 +54,6 @@ pub struct Watcher {
     pub tags: Option<HashMap<String, String>>,
 }
 
-// #[skip_serializing_none]
-// #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
-// pub struct WatcherUpdate {
-//     pub description: Option<String>,
-//     pub source: Option<SourceUpdate>,
-//     pub transitions: Option<Vec<Transition>>,
-// }
-
 impl Watcher {
     pub fn is_valid(&self) -> Result<()> {
         self.source
@@ -96,20 +87,6 @@ pub enum Status {
 impl fmt::Display for Status {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{:?}", self)
-    }
-}
-
-impl FromStr for Status {
-    type Err = ();
-
-    fn from_str(s: &str) -> Result<Status, ()> {
-        match s {
-            "running" => Ok(Status::Running),
-            "pending" => Ok(Status::Pending),
-            "ready" => Ok(Status::Ready),
-            "error" => Ok(Status::Error),
-            _ => Err(()),
-        }
     }
 }
 
