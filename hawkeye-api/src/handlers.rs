@@ -2,13 +2,13 @@ use crate::backend::{WatcherStartStatus, WatcherStopStatus};
 use crate::config::{CALL_WATCHER_TIMEOUT, NAMESPACE};
 use crate::filters::ErrorResponse;
 use crate::templates::container_spec;
-use crate::{backend, config, templates};
+use crate::{backend, templates};
 use hawkeye_core::models::{Status, Watcher};
 use k8s_openapi::api::apps::v1::Deployment;
 use k8s_openapi::api::core::v1::{ConfigMap, Pod, Service};
 use kube::api::{DeleteParams, ListParams, Patch, PatchParams, PostParams};
 use kube::{Api, Client};
-use serde_json::{json, Value};
+use serde_json::json;
 use std::collections::HashMap;
 use std::convert::Infallible;
 use std::time::Duration;
@@ -444,46 +444,13 @@ pub async fn start_watcher(
             StatusCode::NOT_ACCEPTABLE,
         ),
         _ => {
-            // Start Watcher by setting Kubernetes deployment replicas=1
-            let patch_params = PatchParams {
-                field_manager: Some("hawkeye_api".to_string()),
-                ..Default::default()
-            };
-
-            // Set Kubernetes deployment replica=1 via patch.
-            let deployment_scale_json = json!({
-                "apiVersion": "autoscaling/v1",
-                "spec": { "replicas": 1_u16 },
-            });
-            let deployments_client: Api<Deployment> =
-                Api::namespaced(k8s_client.clone(), &config::NAMESPACE);
-            deployments_client
-                .patch_scale(
-                    &templates::deployment_name(&watcher_id),
-                    &patch_params,
-                    &Patch::Merge(&deployment_scale_json),
-                )
-                .await
-                .unwrap();
-
-            // Update the status of the Watcher to indicate it should be running.
-            let status_label_json = json!({
-                "apiVersion": "apps/v1",
-                "metadata": {
-                    "labels": {
-                        "target_status": Status::Running,
-                    }
-                }
-            });
-            deployments_client
-                .patch(
-                    &templates::deployment_name(&watcher_id),
-                    &patch_params,
-                    &Patch::Merge(status_label_json),
-                )
-                .await
-                .unwrap();
-
+            backend::scale_watcher_deployment(&k8s_client, watcher_id.as_ref(), 1_u16).await;
+            backend::update_watcher_deployment_target_status(
+                &k8s_client,
+                watcher_id.as_ref(),
+                Status::Running,
+            )
+            .await;
             ("Watcher is starting".to_owned(), StatusCode::OK)
         }
     };
@@ -515,45 +482,13 @@ pub async fn stop_watcher(
             StatusCode::NOT_ACCEPTABLE,
         ),
         _ => {
-            // Stop watcher / replicas to 0
-            let patch_params = PatchParams {
-                field_manager: Some("hawkeye_api".to_string()),
-                ..Default::default()
-            };
-
-            let deployment_scale_json: Value = json!({
-                "apiVersion": "autoscaling/v1",
-                "spec": { "replicas": 0_i16 },
-            });
-            let deployments_client: Api<Deployment> =
-                Api::namespaced(k8s_client.clone(), &config::NAMESPACE);
-            deployments_client
-                .patch_scale(
-                    &templates::deployment_name(&watcher_id),
-                    &patch_params,
-                    &Patch::Merge(&deployment_scale_json),
-                )
-                .await
-                .unwrap();
-
-            // Update the status of the Watcher to indicate it should be running.
-            let status_label_json = json!({
-                "apiVersion": "apps/v1",
-                "metadata": {
-                    "labels": {
-                        "target_status": Status::Ready,
-                    }
-                }
-            });
-            deployments_client
-                .patch(
-                    &templates::deployment_name(&watcher_id),
-                    &patch_params,
-                    &Patch::Merge(status_label_json),
-                )
-                .await
-                .unwrap();
-
+            backend::scale_watcher_deployment(&k8s_client, watcher_id.as_ref(), 1_u16).await;
+            backend::update_watcher_deployment_target_status(
+                &k8s_client,
+                watcher_id.as_ref(),
+                Status::Running,
+            )
+            .await;
             ("Watcher is stopping.".to_owned(), StatusCode::OK)
         }
     };
@@ -626,40 +561,6 @@ pub trait WatcherStatus {
 
 impl WatcherStatus for Deployment {
     fn get_watcher_status(&self) -> Status {
-        let target_status = self
-            .metadata
-            .labels
-            .as_ref()
-            .and_then(|labels| {
-                labels
-                    .get("target_status")
-                    .map(|status| serde_json::from_str(&format!("\"{}\"", status)).ok())
-            })
-            .flatten()
-            .unwrap_or({
-                let name = self.metadata.name.as_ref().expect("Name must be present");
-                log::error!(
-                    "Deployment {} is missing required 'target_status' label",
-                    name
-                );
-                Status::Error
-            });
-
-        if let Some(status) = self.status.as_ref() {
-            let deploy_status = if status.available_replicas.unwrap_or(0) > 0 {
-                Status::Running
-            } else {
-                Status::Ready
-            };
-            match (deploy_status, target_status) {
-                (Status::Running, Status::Running) => Status::Running,
-                (Status::Ready, Status::Ready) => Status::Ready,
-                (Status::Ready, Status::Running) => Status::Pending,
-                (Status::Running, Status::Ready) => Status::Pending,
-                (_, _) => Status::Error,
-            }
-        } else {
-            Status::Error
-        }
+        backend::get_watcher_status(self)
     }
 }

@@ -159,19 +159,19 @@ pub async fn stop_watcher(k8s_client: &kube::Client, watcher_id: &str) -> Watche
     }
 }
 
-fn get_watcher_status(deployment: &Deployment) -> Status {
+pub fn get_watcher_status(deployment: &Deployment) -> Status {
     let target_status = deployment
         .metadata
         .labels
         .as_ref()
         .and_then(|labels| {
-            labels
-                .get("target_status")
-                .map(|status| serde_json::from_str(&format!("\"{}\"", status)).ok())
+            labels.get("target_status").map(|status| {
+                let s: Status = serde_json::from_str(&format!("\"{}\"", status.to_lowercase()))
+                    .unwrap_or(Status::Error);
+                s
+            })
         })
-        .flatten()
-        .flatten()
-        .unwrap_or({
+        .unwrap_or_else(|| {
             let name = deployment
                 .metadata
                 .name

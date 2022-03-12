@@ -1,13 +1,14 @@
 #
 # Build the executable artifacts to include in a final image.
 #
-FROM rust:1.57-slim-buster as builder
+FROM rust:1.59-slim-buster as builder
 
 RUN apt update -qq
 RUN apt install -y --no-install-recommends \
     pkg-config \
     libglib2.0-dev \
     libgstreamer1.0-dev \
+    libssl-dev \
     libgstreamer-plugins-base1.0-dev
 COPY Cargo.toml /Cargo.toml
 COPY Cargo.lock /Cargo.lock

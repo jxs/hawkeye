@@ -1,7 +1,7 @@
 #
 # Build the executable artifacts to include in a final image.
 #
-FROM rust:1.57-slim-buster as builder
+FROM rust:1.59-slim-buster as builder
 
 RUN apt-get update -qq
 RUN apt-get install -yq \
