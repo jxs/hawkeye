@@ -4,7 +4,7 @@ use k8s_openapi::api::apps::v1::Deployment;
 use k8s_openapi::api::autoscaling::v1::Scale;
 use k8s_openapi::api::core::v1::{ConfigMap, Service};
 use kube::api::{Patch, PatchParams};
-use kube::{Api, Error};
+use kube::Api;
 use serde::Deserialize;
 use serde_json::json;
 
@@ -26,13 +26,6 @@ pub enum WatcherStartStatus {
     InternalError, // INTERNAL_ERROR
 }
 
-impl From<kube::error::Error> for WatcherStartStatus {
-    fn from(err: Error) -> Self {
-        log::error!("Error resolving Watcher Start Status: {:?}", err);
-        WatcherStartStatus::InternalError
-    }
-}
-
 #[derive(Debug, Deserialize, thiserror::Error)]
 pub enum WatcherStopStatus {
     #[error("Watcher is already stopped.")]
@@ -47,13 +40,6 @@ pub enum WatcherStopStatus {
     NotFound, // 404
     #[error("Watcher encountered an internal error.")]
     InternalError, // INTERNAL_ERROR
-}
-
-impl From<kube::error::Error> for WatcherStopStatus {
-    fn from(err: Error) -> Self {
-        log::error!("Error resolving Watcher Stop Status: {:?}", err);
-        WatcherStopStatus::InternalError
-    }
 }
 
 /// Get a Watcher's Kubernetes ConfigMap. It represents a source of truth for Watcher config.
