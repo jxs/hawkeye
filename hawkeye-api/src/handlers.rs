@@ -153,10 +153,20 @@ pub async fn update_watcher(
         backend::update_watcher_configmap(&k8s_client, &existing_watcher),
         backend::update_watcher_deployment(&k8s_client, &existing_watcher),
         backend::update_watcher_service(&k8s_client, &existing_watcher),
-    )?;
+    );
 
-    backend::stop_watcher(&k8s_client, existing_watcher.id.as_ref().unwrap()).await?;
-    backend::start_watcher(&k8s_client, existing_watcher.id.as_ref().unwrap()).await?;
+    if backend::stop_watcher(&k8s_client, existing_watcher.id.as_ref().unwrap()).await.is_err() {
+        return Ok(reply::with_status(
+            reply::json(&json!({})),
+            StatusCode::INTERNAL_SERVER_ERROR,
+        ));
+    };
+    if backend::start_watcher(&k8s_client, existing_watcher.id.as_ref().unwrap()).await.is_err() {
+       return Ok(reply::with_status(
+            reply::json(&json!({})),
+            StatusCode::INTERNAL_SERVER_ERROR,
+        ));
+    };
     existing_watcher.status = Some(deployment.get_watcher_status());
 
     Ok(reply::with_status(
@@ -432,7 +442,7 @@ pub async fn start_watcher(
     let status = backend::start_watcher(&k8s_client, &watcher_id).await
         .unwrap_or_else(|err| {
             log::error!("Unknown error starting Watcher: {:?}", err);
-            WatcherStartStatus::INTERNAL_SERVER_ERROR
+            WatcherStartStatus::InternalError
         });
     let (msg, status_code) = match status {
         WatcherStartStatus::NotFound => ("Watcher can not be found.".to_owned(), StatusCode::OK),
@@ -452,14 +462,14 @@ pub async fn start_watcher(
             StatusCode::INTERNAL_SERVER_ERROR,
         ),
         WatcherStartStatus::Starting => {
-            backend::scale_watcher_deployment(&k8s_client, watcher_id.as_ref(), 1_u16).await;
-            backend::update_watcher_deployment_target_status(
-                &k8s_client,
-                watcher_id.as_ref(),
-                Status::Running,
-            )
-            .await;
-            ("Watcher is starting".to_owned(), StatusCode::OK)
+            if backend::scale_watcher_deployment(&k8s_client, watcher_id.as_ref(), 1_u16).await.is_err() {
+                ("Watcher encountered an internal error.".to_owned(), StatusCode::INTERNAL_SERVER_ERROR)
+            } else if backend::update_watcher_deployment_target_status(&k8s_client, watcher_id.as_ref(), Status::Running).await.is_err() {
+                ("Watcher encountered an internal error.".to_owned(), StatusCode::INTERNAL_SERVER_ERROR)
+            } else {
+                ("Watcher is starting".to_owned(), StatusCode::OK)
+            }
+
         }
     };
 
@@ -478,7 +488,7 @@ pub async fn stop_watcher(
     let status = backend::stop_watcher(&k8s_client, &watcher_id).await
         .unwrap_or_else(|err| {
             log::error!("Unknown error stopping Watcher: {:?}", err);
-            WatcherStopStatus::INTERNAL_SERVER_ERROR
+            WatcherStopStatus::InternalError
         });
     let (msg, status_code) = match status {
         WatcherStopStatus::NotFound => ("Watcher can not be found.".to_owned(), StatusCode::OK),
@@ -498,14 +508,13 @@ pub async fn stop_watcher(
             StatusCode::INTERNAL_SERVER_ERROR,
         ),
         WatcherStopStatus::Stopping => {
-            backend::scale_watcher_deployment(&k8s_client, watcher_id.as_ref(), 1_u16).await;
-            backend::update_watcher_deployment_target_status(
-                &k8s_client,
-                watcher_id.as_ref(),
-                Status::Running,
-            )
-            .await;
-            ("Watcher is stopping.".to_owned(), StatusCode::OK)
+            if backend::scale_watcher_deployment(&k8s_client, watcher_id.as_ref(), 1_u16).await.is_err() {
+                ("Watcher encountered an internal error.".to_owned(), StatusCode::INTERNAL_SERVER_ERROR)
+            } else if backend::update_watcher_deployment_target_status(&k8s_client,watcher_id.as_ref(), Status::Running).await.is_err() {
+                ("Watcher encountered an internal error.".to_owned(), StatusCode::INTERNAL_SERVER_ERROR)
+            } else {
+                ("Watcher is stopping.".to_owned(), StatusCode::OK)
+            }
         }
     };
 
