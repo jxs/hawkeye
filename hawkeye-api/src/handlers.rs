@@ -155,24 +155,15 @@ pub async fn update_watcher(
         backend::update_watcher_service(&k8s_client, &existing_watcher),
     );
 
-    if backend::stop_watcher(&k8s_client, existing_watcher.id.as_ref().unwrap())
-        .await
-        .is_err()
-    {
+    let stop_watcher = backend::stop_watcher(&k8s_client, existing_watcher.id.as_ref().unwrap());
+    let start_watcher = backend::start_watcher(&k8s_client, existing_watcher.id.as_ref().unwrap());
+    if stop_watcher.await.is_err() || start_watcher.await.is_err() {
         return Ok(reply::with_status(
             reply::json(&json!({})),
             StatusCode::INTERNAL_SERVER_ERROR,
         ));
     };
-    if backend::start_watcher(&k8s_client, existing_watcher.id.as_ref().unwrap())
-        .await
-        .is_err()
-    {
-        return Ok(reply::with_status(
-            reply::json(&json!({})),
-            StatusCode::INTERNAL_SERVER_ERROR,
-        ));
-    };
+
     existing_watcher.status = Some(deployment.get_watcher_status());
 
     Ok(reply::with_status(
