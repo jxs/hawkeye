@@ -1,16 +1,17 @@
 use crate::{config, templates};
 use hawkeye_core::models::{Status, Watcher};
 use k8s_openapi::api::apps::v1::Deployment;
+use k8s_openapi::api::autoscaling::v1::Scale;
 use k8s_openapi::api::core::v1::{ConfigMap, Service};
 use kube::api::{Patch, PatchParams};
 use kube::{Api, Error};
 use serde::Deserialize;
 use serde_json::json;
-use thiserror::Error;
+use thiserror;
 
 const FIELD_MGR: &str = "hawkeye_api";
 
-#[derive(Debug, Deserialize, Error)]
+#[derive(Debug, Deserialize, thiserror::Error)]
 pub enum WatcherStartStatus {
     #[error("Watcher is already running.")]
     AlreadyRunning, // OK
@@ -26,7 +27,15 @@ pub enum WatcherStartStatus {
     InternalError,  // INTERNAL_ERROR
 }
 
-#[derive(Debug, Deserialize, Error)]
+impl From<kube::error::Error> for WatcherStartStatus {
+    fn from(err: Error) -> Self {
+        log::error!("Error resolving Watcher Start Status: {:?}", err);
+        WatcherStartStatus::InternalError
+    }
+}
+
+
+#[derive(Debug, Deserialize, thiserror::Error)]
 pub enum WatcherStopStatus {
     #[error("Watcher is already stopped.")]
     AlreadyStopped, // OK
@@ -40,6 +49,13 @@ pub enum WatcherStopStatus {
     NotFound, // 404
     #[error("Watcher encountered an internal error.")]
     InternalError,  // INTERNAL_ERROR
+}
+
+impl From<kube::error::Error> for WatcherStopStatus {
+    fn from(err: Error) -> Self {
+        log::error!("Error resolving Watcher Stop Status: {:?}", err);
+        WatcherStopStatus::InternalError
+    }
 }
 
 /// Get a Watcher's Kubernetes ConfigMap. It represents a source of truth for Watcher config.
@@ -71,7 +87,7 @@ pub async fn scale_watcher_deployment(
     k8s_client: &kube::Client,
     watcher_id: &str,
     replica_count: u16,
-) {
+) -> kube::Result<Scale> {
     let patch_params = PatchParams {
         field_manager: Some(FIELD_MGR.to_owned()),
         ..Default::default()
@@ -89,7 +105,6 @@ pub async fn scale_watcher_deployment(
             &Patch::Merge(&deployment_scale_json),
         )
         .await
-        .unwrap();
 }
 
 /// Update a Watcher's status to indicate it should be running or not.
@@ -97,7 +112,7 @@ pub async fn update_watcher_deployment_target_status(
     k8s_client: &kube::Client,
     watcher_id: &str,
     status: Status,
-) {
+) -> kube::Result<Deployment> {
     let patch_params = PatchParams {
         field_manager: Some(FIELD_MGR.to_owned()),
         ..Default::default()
@@ -119,48 +134,44 @@ pub async fn update_watcher_deployment_target_status(
             &Patch::Merge(status_label_json),
         )
         .await
-        .unwrap();
 }
 
 /// Start a Watcher by setting its replica count to 1.
-pub async fn start_watcher(k8s_client: &kube::Client, watcher_id: &str) -> WatcherStartStatus {
+pub async fn start_watcher(k8s_client: &kube::Client, watcher_id: &str) -> Result<WatcherStartStatus, kube::Error> {
     log::debug!("Starting Watcher {}", watcher_id);
-    let deployment = match get_watcher_deployment(k8s_client, watcher_id).await {
-        Ok(d) => d,
-        _ => return WatcherStartStatus::NotFound,
-    };
+    let deployment = get_watcher_deployment(k8s_client, watcher_id).await?;
 
     // Actions and guards based on the current Watcher status.
-    match get_watcher_status(&deployment) {
+    let status = match get_watcher_status(&deployment) {
         Status::Running => WatcherStartStatus::AlreadyRunning,
         Status::Pending => WatcherStartStatus::CurrentlyUpdating,
         Status::Error => WatcherStartStatus::InErrorState,
         Status::Ready => {
-            scale_watcher_deployment(k8s_client, watcher_id, 1_u16).await;
-            update_watcher_deployment_target_status(k8s_client, watcher_id, Status::Running).await;
+            scale_watcher_deployment(k8s_client, watcher_id, 1_u16).await?;
+            update_watcher_deployment_target_status(k8s_client, watcher_id, Status::Running).await?;
             WatcherStartStatus::Starting
         }
-    }
+    };
+
+    Ok(status)
 }
 
 /// Stop a Watcher by setting its replica count to 0.
-pub async fn stop_watcher(k8s_client: &kube::Client, watcher_id: &str) -> WatcherStopStatus {
+pub async fn stop_watcher(k8s_client: &kube::Client, watcher_id: &str) -> Result<WatcherStopStatus, kube::Error> {
     log::debug!("Stopping Watcher {}", watcher_id);
-    let deployment = match get_watcher_deployment(k8s_client, watcher_id).await {
-        Ok(d) => d,
-        _ => return WatcherStopStatus::NotFound,
-    };
-
-    match get_watcher_status(&deployment) {
+    let deployment = get_watcher_deployment(k8s_client, watcher_id).await?;
+    let status = match get_watcher_status(&deployment) {
         Status::Ready => WatcherStopStatus::AlreadyStopped,
         Status::Pending => WatcherStopStatus::CurrentlyUpdating,
         Status::Error => WatcherStopStatus::InErrorState,
         Status::Running => {
-            scale_watcher_deployment(k8s_client, watcher_id, 0_u16).await;
-            update_watcher_deployment_target_status(k8s_client, watcher_id, Status::Ready).await;
+            scale_watcher_deployment(k8s_client, watcher_id, 0_u16).await?;
+            update_watcher_deployment_target_status(k8s_client, watcher_id, Status::Ready).await?;
             WatcherStopStatus::Stopping
         }
-    }
+    };
+
+    Ok(status)
 }
 
 pub fn get_watcher_status(deployment: &Deployment) -> Status {
@@ -284,13 +295,4 @@ pub async fn update_watcher_service(
             &patch,
         )
         .await
-}
-
-
-impl From<kube::error::Error> for WatcherStartStatus {
-    fn from(err: Error) -> Self {
-        log::error!("Error resolving Watcher Start Status: {:?}", err);
-
-        Wa
-    }
 }

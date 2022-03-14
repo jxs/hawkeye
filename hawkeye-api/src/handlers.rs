@@ -153,10 +153,10 @@ pub async fn update_watcher(
         backend::update_watcher_configmap(&k8s_client, &existing_watcher),
         backend::update_watcher_deployment(&k8s_client, &existing_watcher),
         backend::update_watcher_service(&k8s_client, &existing_watcher),
-    );
+    )?;
 
-    backend::stop_watcher(&k8s_client, existing_watcher.id.as_ref().unwrap()).await;
-    backend::start_watcher(&k8s_client, existing_watcher.id.as_ref().unwrap()).await;
+    backend::stop_watcher(&k8s_client, existing_watcher.id.as_ref().unwrap()).await?;
+    backend::start_watcher(&k8s_client, existing_watcher.id.as_ref().unwrap()).await?;
     existing_watcher.status = Some(deployment.get_watcher_status());
 
     Ok(reply::with_status(
@@ -429,21 +429,29 @@ pub async fn start_watcher(
     watcher_id: String,
     k8s_client: kube::Client,
 ) -> Result<impl warp::Reply, Infallible> {
-    let status = backend::start_watcher(&k8s_client, &watcher_id).await;
+    let status = backend::start_watcher(&k8s_client, &watcher_id).await
+        .unwrap_or_else(|err| {
+            log::error!("Unknown error starting Watcher: {:?}", err);
+            WatcherStartStatus::INTERNAL_SERVER_ERROR
+        });
     let (msg, status_code) = match status {
         WatcherStartStatus::NotFound => ("Watcher can not be found.".to_owned(), StatusCode::OK),
         WatcherStartStatus::AlreadyRunning => {
-            ("Watcher is already running".to_owned(), StatusCode::OK)
+            ("Watcher is already running.".to_owned(), StatusCode::OK)
         }
         WatcherStartStatus::CurrentlyUpdating => (
-            "Watcher is currently updating".to_owned(),
+            "Watcher is currently updating.".to_owned(),
             StatusCode::CONFLICT,
         ),
         WatcherStartStatus::InErrorState => (
-            "Watcher in error state cannot be set to running".to_owned(),
+            "Watcher in error state cannot be set to running.".to_owned(),
             StatusCode::NOT_ACCEPTABLE,
         ),
-        _ => {
+        WatcherStartStatus::InternalError => (
+            "Watcher encountered an internal error.".to_owned(),
+            StatusCode::INTERNAL_SERVER_ERROR,
+        ),
+        WatcherStartStatus::Starting => {
             backend::scale_watcher_deployment(&k8s_client, watcher_id.as_ref(), 1_u16).await;
             backend::update_watcher_deployment_target_status(
                 &k8s_client,
@@ -467,21 +475,29 @@ pub async fn stop_watcher(
     watcher_id: String,
     k8s_client: Client,
 ) -> Result<impl warp::Reply, Infallible> {
-    let status = backend::stop_watcher(&k8s_client, &watcher_id).await;
+    let status = backend::stop_watcher(&k8s_client, &watcher_id).await
+        .unwrap_or_else(|err| {
+            log::error!("Unknown error stopping Watcher: {:?}", err);
+            WatcherStopStatus::INTERNAL_SERVER_ERROR
+        });
     let (msg, status_code) = match status {
         WatcherStopStatus::NotFound => ("Watcher can not be found.".to_owned(), StatusCode::OK),
         WatcherStopStatus::AlreadyStopped => {
-            ("Watcher is already stopped".to_owned(), StatusCode::OK)
+            ("Watcher is already stopped.".to_owned(), StatusCode::OK)
         }
         WatcherStopStatus::CurrentlyUpdating => (
-            "Watcher is currently updating".to_owned(),
+            "Watcher is currently updating.".to_owned(),
             StatusCode::CONFLICT,
         ),
         WatcherStopStatus::InErrorState => (
-            "Watcher in error state cannot be set to stopped".to_owned(),
+            "Watcher in error state cannot be set to stopped.".to_owned(),
             StatusCode::NOT_ACCEPTABLE,
         ),
-        _ => {
+        WatcherStopStatus::InternalError => (
+            "Watcher encountered an internal error.".to_owned(),
+            StatusCode::INTERNAL_SERVER_ERROR,
+        ),
+        WatcherStopStatus::Stopping => {
             backend::scale_watcher_deployment(&k8s_client, watcher_id.as_ref(), 1_u16).await;
             backend::update_watcher_deployment_target_status(
                 &k8s_client,
