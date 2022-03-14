@@ -7,7 +7,6 @@ use kube::api::{Patch, PatchParams};
 use kube::{Api, Error};
 use serde::Deserialize;
 use serde_json::json;
-use thiserror;
 
 const FIELD_MGR: &str = "hawkeye_api";
 
