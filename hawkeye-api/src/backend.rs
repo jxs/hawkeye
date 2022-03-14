@@ -3,7 +3,7 @@ use hawkeye_core::models::{Status, Watcher};
 use k8s_openapi::api::apps::v1::Deployment;
 use k8s_openapi::api::core::v1::{ConfigMap, Service};
 use kube::api::{Patch, PatchParams};
-use kube::Api;
+use kube::{Api, Error};
 use serde::Deserialize;
 use serde_json::json;
 use thiserror::Error;
@@ -13,29 +13,33 @@ const FIELD_MGR: &str = "hawkeye_api";
 #[derive(Debug, Deserialize, Error)]
 pub enum WatcherStartStatus {
     #[error("Watcher is already running.")]
-    AlreadyRunning, // ok
+    AlreadyRunning, // OK
     #[error("Watcher is updating so it cannot be started.")]
-    CurrentlyUpdating, // conflict
+    CurrentlyUpdating, // CONFLICT
     #[error("Watcher is starting.")]
-    Starting, // ok
+    Starting, // OK
     #[error("Watcher is in an error state and cannot be stopped.")]
     InErrorState, // NOT_ACCEPTABLE
     #[error("Watcher not found.")]
     NotFound, // 404
+    #[error("Watcher encountered an internal error.")]
+    InternalError,  // INTERNAL_ERROR
 }
 
 #[derive(Debug, Deserialize, Error)]
 pub enum WatcherStopStatus {
     #[error("Watcher is already stopped.")]
-    AlreadyStopped, // ok
+    AlreadyStopped, // OK
     #[error("Watcher is updating so it cannot be stopped.")]
-    CurrentlyUpdating, // conflict
+    CurrentlyUpdating, // CONFLICT
     #[error("Watching is stopping.")]
-    Stopping, // ok
+    Stopping, // OK
     #[error("Watcher is in an error state and cannot be stopped.")]
     InErrorState, // NOT_ACCEPTABLE
     #[error("Watcher not found.")]
     NotFound, // 404
+    #[error("Watcher encountered an internal error.")]
+    InternalError,  // INTERNAL_ERROR
 }
 
 /// Get a Watcher's Kubernetes ConfigMap. It represents a source of truth for Watcher config.
@@ -118,7 +122,7 @@ pub async fn update_watcher_deployment_target_status(
         .unwrap();
 }
 
-/// Start a Watcher by settings it's replica count to 1.
+/// Start a Watcher by setting its replica count to 1.
 pub async fn start_watcher(k8s_client: &kube::Client, watcher_id: &str) -> WatcherStartStatus {
     log::debug!("Starting Watcher {}", watcher_id);
     let deployment = match get_watcher_deployment(k8s_client, watcher_id).await {
@@ -139,7 +143,7 @@ pub async fn start_watcher(k8s_client: &kube::Client, watcher_id: &str) -> Watch
     }
 }
 
-/// Stop a Watcher by settings it's replica count to 0.
+/// Stop a Watcher by setting its replica count to 0.
 pub async fn stop_watcher(k8s_client: &kube::Client, watcher_id: &str) -> WatcherStopStatus {
     log::debug!("Stopping Watcher {}", watcher_id);
     let deployment = match get_watcher_deployment(k8s_client, watcher_id).await {
@@ -215,7 +219,7 @@ pub async fn update_watcher_configmap(
         watcher.tags.as_ref(),
     );
     let patch_params = PatchParams {
-        field_manager: Some(FIELD_MGR.to_string()),
+        field_manager: Some(FIELD_MGR.to_owned()),
         ..Default::default()
     };
     let patch = Patch::Merge(&config);
@@ -241,7 +245,7 @@ pub async fn update_watcher_deployment(
         watcher.tags.as_ref(),
     );
     let patch_params = PatchParams {
-        field_manager: Some(FIELD_MGR.to_string()),
+        field_manager: Some(FIELD_MGR.to_owned()),
         ..Default::default()
     };
     let patch = Patch::Merge(&deploy);
@@ -268,7 +272,7 @@ pub async fn update_watcher_service(
     // TODO: Handle errors
     // let _ = services.create(&pp, &svc).await.unwrap();
     let patch_params = PatchParams {
-        field_manager: Some("hawkeye_api".to_string()),
+        field_manager: Some(FIELD_MGR.to_owned()),
         ..Default::default()
     };
     let patch = Patch::Merge(&svc);
@@ -280,4 +284,13 @@ pub async fn update_watcher_service(
             &patch,
         )
         .await
+}
+
+
+impl From<kube::error::Error> for WatcherStartStatus {
+    fn from(err: Error) -> Self {
+        log::error!("Error resolving Watcher Start Status: {:?}", err);
+
+        Wa
+    }
 }
