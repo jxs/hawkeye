@@ -24,7 +24,7 @@ pub enum WatcherStartStatus {
     #[error("Watcher not found.")]
     NotFound, // 404
     #[error("Watcher encountered an internal error.")]
-    InternalError,  // INTERNAL_ERROR
+    InternalError, // INTERNAL_ERROR
 }
 
 impl From<kube::error::Error> for WatcherStartStatus {
@@ -33,7 +33,6 @@ impl From<kube::error::Error> for WatcherStartStatus {
         WatcherStartStatus::InternalError
     }
 }
-
 
 #[derive(Debug, Deserialize, thiserror::Error)]
 pub enum WatcherStopStatus {
@@ -48,7 +47,7 @@ pub enum WatcherStopStatus {
     #[error("Watcher not found.")]
     NotFound, // 404
     #[error("Watcher encountered an internal error.")]
-    InternalError,  // INTERNAL_ERROR
+    InternalError, // INTERNAL_ERROR
 }
 
 impl From<kube::error::Error> for WatcherStopStatus {
@@ -137,7 +136,10 @@ pub async fn update_watcher_deployment_target_status(
 }
 
 /// Start a Watcher by setting its replica count to 1.
-pub async fn start_watcher(k8s_client: &kube::Client, watcher_id: &str) -> Result<WatcherStartStatus, kube::Error> {
+pub async fn start_watcher(
+    k8s_client: &kube::Client,
+    watcher_id: &str,
+) -> Result<WatcherStartStatus, kube::Error> {
     log::debug!("Starting Watcher {}", watcher_id);
     let deployment = get_watcher_deployment(k8s_client, watcher_id).await?;
 
@@ -148,7 +150,8 @@ pub async fn start_watcher(k8s_client: &kube::Client, watcher_id: &str) -> Resul
         Status::Error => WatcherStartStatus::InErrorState,
         Status::Ready => {
             scale_watcher_deployment(k8s_client, watcher_id, 1_u16).await?;
-            update_watcher_deployment_target_status(k8s_client, watcher_id, Status::Running).await?;
+            update_watcher_deployment_target_status(k8s_client, watcher_id, Status::Running)
+                .await?;
             WatcherStartStatus::Starting
         }
     };
@@ -157,7 +160,10 @@ pub async fn start_watcher(k8s_client: &kube::Client, watcher_id: &str) -> Resul
 }
 
 /// Stop a Watcher by setting its replica count to 0.
-pub async fn stop_watcher(k8s_client: &kube::Client, watcher_id: &str) -> Result<WatcherStopStatus, kube::Error> {
+pub async fn stop_watcher(
+    k8s_client: &kube::Client,
+    watcher_id: &str,
+) -> Result<WatcherStopStatus, kube::Error> {
     log::debug!("Stopping Watcher {}", watcher_id);
     let deployment = get_watcher_deployment(k8s_client, watcher_id).await?;
     let status = match get_watcher_status(&deployment) {

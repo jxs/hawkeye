@@ -155,14 +155,20 @@ pub async fn update_watcher(
         backend::update_watcher_service(&k8s_client, &existing_watcher),
     );
 
-    if backend::stop_watcher(&k8s_client, existing_watcher.id.as_ref().unwrap()).await.is_err() {
+    if backend::stop_watcher(&k8s_client, existing_watcher.id.as_ref().unwrap())
+        .await
+        .is_err()
+    {
         return Ok(reply::with_status(
             reply::json(&json!({})),
             StatusCode::INTERNAL_SERVER_ERROR,
         ));
     };
-    if backend::start_watcher(&k8s_client, existing_watcher.id.as_ref().unwrap()).await.is_err() {
-       return Ok(reply::with_status(
+    if backend::start_watcher(&k8s_client, existing_watcher.id.as_ref().unwrap())
+        .await
+        .is_err()
+    {
+        return Ok(reply::with_status(
             reply::json(&json!({})),
             StatusCode::INTERNAL_SERVER_ERROR,
         ));
@@ -439,7 +445,8 @@ pub async fn start_watcher(
     watcher_id: String,
     k8s_client: kube::Client,
 ) -> Result<impl warp::Reply, Infallible> {
-    let status = backend::start_watcher(&k8s_client, &watcher_id).await
+    let status = backend::start_watcher(&k8s_client, &watcher_id)
+        .await
         .unwrap_or_else(|err| {
             log::error!("Unknown error starting Watcher: {:?}", err);
             WatcherStartStatus::InternalError
@@ -462,14 +469,29 @@ pub async fn start_watcher(
             StatusCode::INTERNAL_SERVER_ERROR,
         ),
         WatcherStartStatus::Starting => {
-            if backend::scale_watcher_deployment(&k8s_client, watcher_id.as_ref(), 1_u16).await.is_err() {
-                ("Watcher encountered an internal error.".to_owned(), StatusCode::INTERNAL_SERVER_ERROR)
-            } else if backend::update_watcher_deployment_target_status(&k8s_client, watcher_id.as_ref(), Status::Running).await.is_err() {
-                ("Watcher encountered an internal error.".to_owned(), StatusCode::INTERNAL_SERVER_ERROR)
+            if backend::scale_watcher_deployment(&k8s_client, watcher_id.as_ref(), 1_u16)
+                .await
+                .is_err()
+            {
+                (
+                    "Watcher encountered an internal error.".to_owned(),
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                )
+            } else if backend::update_watcher_deployment_target_status(
+                &k8s_client,
+                watcher_id.as_ref(),
+                Status::Running,
+            )
+            .await
+            .is_err()
+            {
+                (
+                    "Watcher encountered an internal error.".to_owned(),
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                )
             } else {
                 ("Watcher is starting".to_owned(), StatusCode::OK)
             }
-
         }
     };
 
@@ -485,7 +507,8 @@ pub async fn stop_watcher(
     watcher_id: String,
     k8s_client: Client,
 ) -> Result<impl warp::Reply, Infallible> {
-    let status = backend::stop_watcher(&k8s_client, &watcher_id).await
+    let status = backend::stop_watcher(&k8s_client, &watcher_id)
+        .await
         .unwrap_or_else(|err| {
             log::error!("Unknown error stopping Watcher: {:?}", err);
             WatcherStopStatus::InternalError
@@ -508,10 +531,26 @@ pub async fn stop_watcher(
             StatusCode::INTERNAL_SERVER_ERROR,
         ),
         WatcherStopStatus::Stopping => {
-            if backend::scale_watcher_deployment(&k8s_client, watcher_id.as_ref(), 1_u16).await.is_err() {
-                ("Watcher encountered an internal error.".to_owned(), StatusCode::INTERNAL_SERVER_ERROR)
-            } else if backend::update_watcher_deployment_target_status(&k8s_client,watcher_id.as_ref(), Status::Running).await.is_err() {
-                ("Watcher encountered an internal error.".to_owned(), StatusCode::INTERNAL_SERVER_ERROR)
+            if backend::scale_watcher_deployment(&k8s_client, watcher_id.as_ref(), 1_u16)
+                .await
+                .is_err()
+            {
+                (
+                    "Watcher encountered an internal error.".to_owned(),
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                )
+            } else if backend::update_watcher_deployment_target_status(
+                &k8s_client,
+                watcher_id.as_ref(),
+                Status::Running,
+            )
+            .await
+            .is_err()
+            {
+                (
+                    "Watcher encountered an internal error.".to_owned(),
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                )
             } else {
                 ("Watcher is stopping.".to_owned(), StatusCode::OK)
             }
