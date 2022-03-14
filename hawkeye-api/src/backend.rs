@@ -31,9 +31,9 @@ pub enum WatcherStopStatus {
     #[error("Watcher is already stopped.")]
     AlreadyStopped, // OK
     #[error("Watcher is updating so it cannot be stopped.")]
-    CurrentlyUpdating, // CONFLICT
-    #[error("Watching is stopping.")]
-    Stopping, // OK
+    CurrentlyUpdating, // conflict
+    #[error("Watcher is stopping.")]
+    Stopping, // ok
     #[error("Watcher is in an error state and cannot be stopped.")]
     InErrorState, // NOT_ACCEPTABLE
     #[error("Watcher not found.")]
