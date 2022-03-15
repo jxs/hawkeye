@@ -149,7 +149,7 @@ pub async fn update_watcher(
         serde_json::from_str(config_map.data.unwrap().get("watcher.json").unwrap()).unwrap();
     existing_watcher.merge(payload_watcher);
 
-    let (_, _, _) = tokio::join!(
+    let (update_configmap_result, update_watcher_deployment_result, update_watcher_service_result) = tokio::join!(
         backend::update_watcher_configmap(&k8s_client, &existing_watcher),
         backend::update_watcher_deployment(&k8s_client, &existing_watcher),
         backend::update_watcher_service(&k8s_client, &existing_watcher),
@@ -157,7 +157,17 @@ pub async fn update_watcher(
 
     let stop_watcher = backend::stop_watcher(&k8s_client, existing_watcher.id.as_ref().unwrap());
     let start_watcher = backend::start_watcher(&k8s_client, existing_watcher.id.as_ref().unwrap());
-    if stop_watcher.await.is_err() || start_watcher.await.is_err() {
+
+    if itertools::any(
+        &[
+            update_configmap_result.is_err(),
+            update_watcher_deployment_result.is_err(),
+            update_watcher_service_result.is_err(),
+            stop_watcher.await.is_err(),
+            start_watcher.await.is_err(),
+        ],
+        |fut_err| *fut_err,
+    ) {
         return Ok(reply::with_status(
             reply::json(&json!({})),
             StatusCode::INTERNAL_SERVER_ERROR,

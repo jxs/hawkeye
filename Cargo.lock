@@ -1124,6 +1124,7 @@ dependencies = [
  "anyhow",
  "eyre",
  "hawkeye-core",
+ "itertools",
  "k8s-openapi",
  "kube",
  "lazy_static",
