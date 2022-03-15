@@ -272,7 +272,6 @@ pub async fn update_watcher_service(
         watcher.tags.as_ref(),
     );
     // TODO: Handle errors
-    // let _ = services.create(&pp, &svc).await.unwrap();
     let patch_params = PatchParams {
         field_manager: Some(FIELD_MGR.to_owned()),
         ..Default::default()
