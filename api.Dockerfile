@@ -3,8 +3,8 @@
 #
 FROM rust:1.59-slim-buster as builder
 
-RUN apt-get update -qq
-RUN apt-get install -yq \
+RUN apt update -qq
+RUN apt install -yq --no-install-recommends \
     pkg-config \
     libssl-dev
 COPY Cargo.toml /Cargo.toml
@@ -26,7 +26,7 @@ ARG RUST_LOG=info
 ENV RUST_LOG ${RUST_LOG}
 
 RUN apt-get update -qq \
-    && apt-get install -y \
+    && apt install -y --no-install-recommends \
         libssl-dev
 
 COPY --from=builder /target/release/hawkeye-api .
