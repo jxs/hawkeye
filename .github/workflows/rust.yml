@@ -6,8 +6,8 @@ on:
   pull_request:
 
 env:
-  CARGO_TERM_COLOR: always
   AUTH: ${{secrets.VP_DEPLOY_USER}}:${{secrets.VP_DEPLOY_SECRET}}
+  CARGO_TERM_COLOR: always
   REPO: ${{secrets.DEPLOY_REPO}}
 
 jobs:
@@ -34,6 +34,8 @@ jobs:
             gstreamer1.0-plugins-bad gstreamer1.0-libav libgstrtspserver-1.0-dev \
             libssl-dev libges-1.0-dev
       - uses: actions/checkout@v2
+      - name: Cargo Version
+        run: cargo --version
       - name: Build
         run: cargo build --verbose
       - name: Run Clippy
