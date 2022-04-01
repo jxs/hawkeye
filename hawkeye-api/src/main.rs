@@ -3,6 +3,7 @@ mod backend;
 mod config;
 mod filters;
 mod handlers;
+mod migrations;
 mod templates;
 
 use hawkeye_core::utils::maybe_bootstrap_sentry;

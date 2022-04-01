@@ -1131,6 +1131,7 @@ dependencies = [
  "log",
  "pretty_env_logger",
  "rand 0.7.3",
+ "regex",
  "reqwest 0.10.10",
  "serde",
  "serde_json",

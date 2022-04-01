@@ -2,7 +2,7 @@ use crate::backend::{WatcherStartStatus, WatcherStopStatus};
 use crate::config::{CALL_WATCHER_TIMEOUT, NAMESPACE};
 use crate::filters::ErrorResponse;
 use crate::templates::container_spec;
-use crate::{backend, templates};
+use crate::{backend, migrations, templates};
 use hawkeye_core::models::{Status, Watcher};
 use k8s_openapi::api::apps::v1::Deployment;
 use k8s_openapi::api::core::v1::{ConfigMap, Pod, Service};
@@ -618,4 +618,16 @@ impl WatcherStatus for Deployment {
     fn get_watcher_status(&self) -> Status {
         backend::get_watcher_status(self)
     }
+}
+
+pub async fn migrate_to_multislate(
+    k8s_client: kube::Client,
+) -> Result<impl warp::Reply, Infallible> {
+    migrations::migration_multislate(&k8s_client).await;
+    Ok(reply::with_status(
+        reply::json(&json!({
+            "message": "migrate_to_multislate complete.",
+        })),
+        StatusCode::OK,
+    ))
 }

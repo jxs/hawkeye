@@ -21,6 +21,7 @@ pub fn v1(
         .or(watcher_start(client.clone()))
         .or(watcher_stop(client.clone()))
         .or(watcher_video_frame(client.clone()))
+        .or(migration_for_multislate(client.clone()))
         .or(healthcheck(client))
         .recover(handle_rejection)
 }
@@ -123,6 +124,17 @@ pub fn watcher_video_frame(
         .and(warp::get())
         .and(with_client(client))
         .and_then(handlers::get_video_frame)
+}
+
+/// POST /v1/migration/1/multislate
+pub fn migration_for_multislate(
+    client: Client,
+) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+    warp::path!("v1" / "migrations" / "1" / "multislate")
+        .and(auth::verify())
+        .and(warp::post())
+        .and(with_client(client))
+        .and_then(handlers::migrate_to_multislate)
 }
 
 /// GET /healthcheck
