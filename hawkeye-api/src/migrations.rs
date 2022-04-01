@@ -74,6 +74,10 @@ pub async fn migration_multislate(k8s_client: &kube::Client) {
         // PATCH the k8s ConfigMap with the new migrated JSON.
         let watcher: Watcher = serde_json::from_str(migrated_json).unwrap();
         let _ = backend::update_watcher_configmap(k8s_client, &watcher).await;
-        log::info!("{} Updated ConfigMap: {}", log_prefix, configmap.metadata.name.unwrap());
+        log::info!(
+            "{} Updated ConfigMap: {}",
+            log_prefix,
+            configmap.metadata.name.unwrap()
+        );
     }
 }

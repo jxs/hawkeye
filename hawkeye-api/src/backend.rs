@@ -1,3 +1,4 @@
+use crate::handlers::WatcherStatus;
 use crate::{config, templates};
 use hawkeye_core::models::{Status, Watcher};
 use k8s_openapi::api::apps::v1::Deployment;
@@ -7,7 +8,6 @@ use kube::api::{Patch, PatchParams};
 use kube::Api;
 use serde::Deserialize;
 use serde_json::json;
-use crate::handlers::WatcherStatus;
 
 const FIELD_MGR: &str = "hawkeye_api";
 
@@ -128,7 +128,6 @@ pub async fn start_watcher(
 ) -> Result<WatcherStartStatus, kube::Error> {
     log::debug!("Starting Watcher {}", watcher_id);
     let deployment = get_watcher_deployment(k8s_client, watcher_id).await?;
-
 
     // Actions and guards based on the current Watcher status.
     let status = match deployment.get_watcher_status() {
