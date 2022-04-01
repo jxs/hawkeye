@@ -7,6 +7,7 @@ use kube::api::{Patch, PatchParams};
 use kube::Api;
 use serde::Deserialize;
 use serde_json::json;
+use crate::handlers::WatcherStatus;
 
 const FIELD_MGR: &str = "hawkeye_api";
 
@@ -128,8 +129,9 @@ pub async fn start_watcher(
     log::debug!("Starting Watcher {}", watcher_id);
     let deployment = get_watcher_deployment(k8s_client, watcher_id).await?;
 
+
     // Actions and guards based on the current Watcher status.
-    let status = match get_watcher_status(&deployment) {
+    let status = match deployment.get_watcher_status() {
         Status::Running => WatcherStartStatus::AlreadyRunning,
         Status::Pending => WatcherStartStatus::CurrentlyUpdating,
         Status::Error => WatcherStartStatus::InErrorState,
@@ -151,7 +153,7 @@ pub async fn stop_watcher(
 ) -> Result<WatcherStopStatus, kube::Error> {
     log::debug!("Stopping Watcher {}", watcher_id);
     let deployment = get_watcher_deployment(k8s_client, watcher_id).await?;
-    let status = match get_watcher_status(&deployment) {
+    let status = match deployment.get_watcher_status() {
         Status::Ready => WatcherStopStatus::AlreadyStopped,
         Status::Pending => WatcherStopStatus::CurrentlyUpdating,
         Status::Error => WatcherStopStatus::InErrorState,
