@@ -149,11 +149,9 @@ pub async fn update_watcher(
         serde_json::from_str(config_map.data.unwrap().get("watcher.json").unwrap()).unwrap();
     existing_watcher.merge(payload_watcher);
 
-    let (update_configmap_result, update_watcher_deployment_result, update_watcher_service_result) = tokio::join!(
-        backend::update_watcher_configmap(&k8s_client, &existing_watcher),
-        backend::update_watcher_deployment(&k8s_client, &existing_watcher),
-        backend::update_watcher_service(&k8s_client, &existing_watcher),
-    );
+    let _ = backend::update_watcher_configmap(&k8s_client, &existing_watcher).await;
+    let _ = backend::update_watcher_deployment(&k8s_client, &existing_watcher).await;
+    let _ = backend::update_watcher_service(&k8s_client, &existing_watcher).await;
 
     let stop_watcher = backend::stop_watcher(&k8s_client, existing_watcher.id.as_ref().unwrap());
     let start_watcher = backend::start_watcher(&k8s_client, existing_watcher.id.as_ref().unwrap());
