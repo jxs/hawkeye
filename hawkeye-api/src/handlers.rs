@@ -149,20 +149,15 @@ pub async fn update_watcher(
         serde_json::from_str(config_map.data.unwrap().get("watcher.json").unwrap()).unwrap();
     existing_watcher.merge(payload_watcher);
 
-    let _ = backend::update_watcher_configmap(&k8s_client, &existing_watcher).await;
-    let _ = backend::update_watcher_deployment(&k8s_client, &existing_watcher).await;
-    let _ = backend::update_watcher_service(&k8s_client, &existing_watcher).await;
-
-    let stop_watcher = backend::stop_watcher(&k8s_client, existing_watcher.id.as_ref().unwrap());
-    let start_watcher = backend::start_watcher(&k8s_client, existing_watcher.id.as_ref().unwrap());
+    let update_configmap_result = backend::update_watcher_configmap(&k8s_client, &existing_watcher).await;
+    let update_watcher_deployment_result = backend::update_watcher_deployment(&k8s_client, &existing_watcher).await;
+    let update_watcher_service_result = backend::update_watcher_service(&k8s_client, &existing_watcher).await;
 
     if itertools::any(
         &[
             update_configmap_result.is_err(),
             update_watcher_deployment_result.is_err(),
             update_watcher_service_result.is_err(),
-            stop_watcher.await.is_err(),
-            start_watcher.await.is_err(),
         ],
         |fut_err| *fut_err,
     ) {
@@ -171,6 +166,12 @@ pub async fn update_watcher(
             StatusCode::INTERNAL_SERVER_ERROR,
         ));
     };
+
+    // Only restart the worker if it was already started.
+    if existing_watcher.status == Some(Status::Running) {
+        backend::stop_watcher(&k8s_client, existing_watcher.id.as_ref().unwrap());
+        backend::start_watcher(&k8s_client, existing_watcher.id.as_ref().unwrap());
+    }
 
     existing_watcher.status = Some(deployment.get_watcher_status());
 
