@@ -16,7 +16,11 @@ pub async fn migration_multislate(k8s_client: &kube::Client) {
     let lp = ListParams::default();
     let config_maps = configmaps_client.list(&lp).await.unwrap();
 
-    // let mut watchers: Vec<Watcher> = Vec::new();
+    let re_slate_url = Regex::new("\"slate_url\":\"(.*?)\",").unwrap();
+    let re_from_slate = Regex::new("\"from\":\"slate\"").unwrap();
+    let re_to_content = Regex::new("\"to\":\"content\"").unwrap();
+    let re_from_content = Regex::new("\"from\":\"content\"").unwrap();
+
     for configmap in config_maps.items {
         log::info!(
             "{} Investigating k8s ConfigMap: {:?}",
@@ -28,8 +32,6 @@ pub async fn migration_multislate(k8s_client: &kube::Client) {
             Some(v) => v,
             None => continue,
         };
-
-        let re_slate_url = Regex::new("\"slate_url\":\"(.*?)\",").unwrap();
 
         let slate_url = match re_slate_url.captures(watcher_json) {
             Some(u) => u.get(1).map(|m| m.as_str()).unwrap(),
@@ -46,17 +48,14 @@ pub async fn migration_multislate(k8s_client: &kube::Client) {
         let migrated_json = &re_slate_url.replace(watcher_json, "").to_string();
 
         // Migrate content:from and content:to transitions
-        let re_from_content = Regex::new("\"from\":\"content\"").unwrap();
         let migrated_json = &re_from_content
             .replace(migrated_json, "\"from\":{\"frame_type\":\"content\"}")
             .to_string();
-        let re_to_content = Regex::new("\"to\":\"content\"").unwrap();
         let migrated_json = &re_to_content
             .replace(migrated_json, "\"to\":{\"frame_type\":\"content\"}")
             .to_string();
 
         // Migrate from:slate transitions
-        let re_from_slate = Regex::new("\"from\":\"slate\"").unwrap();
         let replace = format!(
             "\"from\":{{\"frame_type\":\"slate\",\"slate_context\":{{\"url\":\"{}\"}}}}",
             slate_url

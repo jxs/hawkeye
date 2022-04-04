@@ -149,9 +149,12 @@ pub async fn update_watcher(
         serde_json::from_str(config_map.data.unwrap().get("watcher.json").unwrap()).unwrap();
     existing_watcher.merge(payload_watcher);
 
-    let update_configmap_result = backend::update_watcher_configmap(&k8s_client, &existing_watcher).await;
-    let update_watcher_deployment_result = backend::update_watcher_deployment(&k8s_client, &existing_watcher).await;
-    let update_watcher_service_result = backend::update_watcher_service(&k8s_client, &existing_watcher).await;
+    let update_configmap_result =
+        backend::update_watcher_configmap(&k8s_client, &existing_watcher).await;
+    let update_watcher_deployment_result =
+        backend::update_watcher_deployment(&k8s_client, &existing_watcher).await;
+    let update_watcher_service_result =
+        backend::update_watcher_service(&k8s_client, &existing_watcher).await;
 
     if itertools::any(
         &[
