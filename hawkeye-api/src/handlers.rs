@@ -169,8 +169,8 @@ pub async fn update_watcher(
 
     // Only restart the worker if it was already started.
     if existing_watcher.status == Some(Status::Running) {
-        backend::stop_watcher(&k8s_client, existing_watcher.id.as_ref().unwrap());
-        backend::start_watcher(&k8s_client, existing_watcher.id.as_ref().unwrap());
+        let _ = backend::stop_watcher(&k8s_client, existing_watcher.id.as_ref().unwrap());
+        let _ = backend::start_watcher(&k8s_client, existing_watcher.id.as_ref().unwrap());
     }
 
     existing_watcher.status = Some(deployment.get_watcher_status());
