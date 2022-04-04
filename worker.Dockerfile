@@ -6,6 +6,7 @@ FROM rust:1.57-slim-buster as builder
 RUN apt update -qq
 RUN apt install -y --no-install-recommends \
     pkg-config \
+    libssl-dev \
     libglib2.0-dev \
     libgstreamer1.0-dev \
     libgstreamer-plugins-base1.0-dev
