@@ -8,7 +8,7 @@ use kube::api::{Patch, PatchParams};
 use kube::Api;
 use serde::Deserialize;
 use serde_json::json;
-use std::{thread, time};
+use std::time;
 
 const FIELD_MGR: &str = "hawkeye_api";
 
@@ -309,9 +309,6 @@ pub async fn apply_watcher_updates(
     k8s_client: &kube::Client,
     watcher: &Watcher,
 ) -> Result<(), kube::Error> {
-    // TODO: clean this up. I ran out of time trying to get ? to work correctly with warp and need
-    // to move on.
-
     // Update k8s resources.
     let _ = update_watcher_configmap(k8s_client, watcher).await?;
     let _ = update_watcher_deployment(k8s_client, watcher).await?;
@@ -331,7 +328,7 @@ pub async fn apply_watcher_updates(
             if deployment_status.get_watcher_status() == Status::Ready {
                 break;
             }
-            thread::sleep(retry_sleep);
+            let _ = tokio::time::sleep(retry_sleep);
         }
 
         let _ = start_watcher(k8s_client, watcher_id).await?;
