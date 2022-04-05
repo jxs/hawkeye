@@ -1,6 +1,6 @@
 use crate::backend::{WatcherStartStatus, WatcherStopStatus};
 use crate::config::{CALL_WATCHER_TIMEOUT, NAMESPACE};
-use crate::filters::ErrorResponse;
+use crate::filters::{ErrorResponse, InternalError};
 use crate::templates::container_spec;
 use crate::{backend, migrations, templates};
 use hawkeye_core::models::{Status, Watcher};
@@ -145,35 +145,31 @@ pub async fn update_watcher(
         }
     };
 
+    // Get the existing Watcher and apply the payload changes to it.
     let mut existing_watcher: Watcher =
         serde_json::from_str(config_map.data.unwrap().get("watcher.json").unwrap()).unwrap();
     existing_watcher.merge(payload_watcher);
 
-    let update_configmap_result =
-        backend::update_watcher_configmap(&k8s_client, &existing_watcher).await;
-    let update_watcher_deployment_result =
-        backend::update_watcher_deployment(&k8s_client, &existing_watcher).await;
-    let update_watcher_service_result =
-        backend::update_watcher_service(&k8s_client, &existing_watcher).await;
-
-    if itertools::any(
-        &[
-            update_configmap_result.is_err(),
-            update_watcher_deployment_result.is_err(),
-            update_watcher_service_result.is_err(),
-        ],
-        |fut_err| *fut_err,
-    ) {
-        return Ok(reply::with_status(
-            reply::json(&json!({})),
-            StatusCode::INTERNAL_SERVER_ERROR,
-        ));
-    };
+    // Update k8s resources.
+    let _ = backend::update_watcher_configmap(&k8s_client, &existing_watcher)
+        .await
+        .map_err(|_| warp::reject::custom(InternalError));
+    let _ = backend::update_watcher_deployment(&k8s_client, &existing_watcher)
+        .await
+        .map_err(|_| warp::reject::custom(InternalError));
+    let _ = backend::update_watcher_service(&k8s_client, &existing_watcher)
+        .await
+        .map_err(|_| warp::reject::custom(InternalError));
 
     // Only restart the worker if it was already started.
     if existing_watcher.status == Some(Status::Running) {
-        let _ = backend::stop_watcher(&k8s_client, existing_watcher.id.as_ref().unwrap());
-        let _ = backend::start_watcher(&k8s_client, existing_watcher.id.as_ref().unwrap());
+        let watcher_id = existing_watcher.id.as_ref().unwrap();
+        let _ = backend::stop_watcher(&k8s_client, watcher_id)
+            .await
+            .map_err(|_| warp::reject::custom(InternalError));
+        let _ = backend::start_watcher(&k8s_client, watcher_id)
+            .await
+            .map_err(|_| warp::reject::custom(InternalError));
     }
 
     existing_watcher.status = Some(deployment.get_watcher_status());

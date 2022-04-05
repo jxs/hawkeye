@@ -1,4 +1,4 @@
-use crate::{auth, handlers};
+use crate::{auth, filters, handlers};
 use eyre::ErrReport;
 use hawkeye_core::models::Watcher;
 use kube::Client;
@@ -213,6 +213,8 @@ async fn handle_rejection(
         message = err.to_string();
     } else if err.find::<auth::NoAuth>().is_some() {
         code = StatusCode::UNAUTHORIZED;
+     } else if err.find::<filters::InternalError>().is_some() {
+        code = StatusCode::INTERNAL_SERVER_ERROR;
     } else if let Some(e) = err.find::<ErrorResponse>() {
         code = StatusCode::UNPROCESSABLE_ENTITY;
         message = e.message.to_owned();
@@ -239,3 +241,7 @@ async fn handle_rejection(
     let json = warp::reply::json(&ErrorResponse { message });
     Ok(warp::reply::with_status(json, code))
 }
+
+#[derive(Debug)]
+pub struct InternalError;
+impl warp::reject::Reject for InternalError {}
