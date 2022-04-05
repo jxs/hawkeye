@@ -149,30 +149,11 @@ pub async fn update_watcher(
     let mut existing_watcher: Watcher =
         serde_json::from_str(config_map.data.unwrap().get("watcher.json").unwrap()).unwrap();
     existing_watcher.merge(payload_watcher);
-
-    // Update k8s resources.
-    let _ = backend::update_watcher_configmap(&k8s_client, &existing_watcher)
-        .await
-        .map_err(|_| warp::reject::custom(InternalError));
-    let _ = backend::update_watcher_deployment(&k8s_client, &existing_watcher)
-        .await
-        .map_err(|_| warp::reject::custom(InternalError));
-    let _ = backend::update_watcher_service(&k8s_client, &existing_watcher)
-        .await
-        .map_err(|_| warp::reject::custom(InternalError));
-
-    // Only restart the worker if it was already started.
-    if existing_watcher.status == Some(Status::Running) {
-        let watcher_id = existing_watcher.id.as_ref().unwrap();
-        let _ = backend::stop_watcher(&k8s_client, watcher_id)
-            .await
-            .map_err(|_| warp::reject::custom(InternalError));
-        let _ = backend::start_watcher(&k8s_client, watcher_id)
-            .await
-            .map_err(|_| warp::reject::custom(InternalError));
-    }
-
     existing_watcher.status = Some(deployment.get_watcher_status());
+
+    let _ = backend::apply_watcher_updates(&k8s_client, &existing_watcher)
+        .await
+        .map_err(|_| warp::reject::custom(InternalError));
 
     Ok(reply::with_status(
         reply::json(&existing_watcher),
@@ -526,12 +507,12 @@ pub async fn stop_watcher(
         ),
         WatcherStopStatus::Stopping => {
             let scale_watcher_deployment =
-                backend::scale_watcher_deployment(&k8s_client, watcher_id.as_ref(), 1_u16);
+                backend::scale_watcher_deployment(&k8s_client, watcher_id.as_ref(), 0_u16);
             let update_watcher_deployment_target_status =
                 backend::update_watcher_deployment_target_status(
                     &k8s_client,
                     watcher_id.as_ref(),
-                    Status::Running,
+                    Status::Ready,
                 );
             if scale_watcher_deployment.await.is_err()
                 || update_watcher_deployment_target_status.await.is_err()

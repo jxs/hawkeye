@@ -213,7 +213,7 @@ async fn handle_rejection(
         message = err.to_string();
     } else if err.find::<auth::NoAuth>().is_some() {
         code = StatusCode::UNAUTHORIZED;
-     } else if err.find::<filters::InternalError>().is_some() {
+    } else if err.find::<filters::InternalError>().is_some() {
         code = StatusCode::INTERNAL_SERVER_ERROR;
     } else if let Some(e) = err.find::<ErrorResponse>() {
         code = StatusCode::UNPROCESSABLE_ENTITY;

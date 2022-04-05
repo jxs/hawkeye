@@ -8,6 +8,7 @@ use kube::api::{Patch, PatchParams};
 use kube::Api;
 use serde::Deserialize;
 use serde_json::json;
+use std::{thread, time};
 
 const FIELD_MGR: &str = "hawkeye_api";
 
@@ -141,6 +142,11 @@ pub async fn start_watcher(
             WatcherStartStatus::Starting
         }
     };
+    log::debug!(
+        "Starting Watcher {} resulted in status: {:?}",
+        watcher_id,
+        status
+    );
 
     Ok(status)
 }
@@ -162,6 +168,11 @@ pub async fn stop_watcher(
             WatcherStopStatus::Stopping
         }
     };
+    log::debug!(
+        "Stopping Watcher {} resulted in status: {:?}",
+        watcher_id,
+        status
+    );
 
     Ok(status)
 }
@@ -197,6 +208,11 @@ pub fn get_watcher_status(deployment: &Deployment) -> Status {
         } else {
             Status::Ready
         };
+        log::debug!(
+            "backend::get_watcher_status deploy_status={} target_status={}",
+            deploy_status,
+            target_status
+        );
         match (deploy_status, target_status) {
             (Status::Running, Status::Running) => Status::Running,
             (Status::Ready, Status::Ready) => Status::Ready,
@@ -286,4 +302,40 @@ pub async fn update_watcher_service(
             &patch,
         )
         .await
+}
+
+// Apply Watcher updates and restart Watcher if it was previously running.
+pub async fn apply_watcher_updates(
+    k8s_client: &kube::Client,
+    watcher: &Watcher,
+) -> Result<(), kube::Error> {
+    // TODO: clean this up. I ran out of time trying to get ? to work correctly with warp and need
+    // to move on.
+
+    // Update k8s resources.
+    let _ = update_watcher_configmap(k8s_client, watcher).await?;
+    let _ = update_watcher_deployment(k8s_client, watcher).await?;
+    let _ = update_watcher_service(k8s_client, watcher).await?;
+
+    // Only restart the worker if it was already started.
+    let retry_sleep = time::Duration::from_secs(1);
+    log::warn!("Watcher status: {:?}", watcher.status);
+    if watcher.status != Some(Status::Ready) {
+        let watcher_id = watcher.id.as_ref().unwrap();
+        let _ = stop_watcher(k8s_client, watcher_id).await?;
+
+        // k8s can take a few seconds to update, so retry a few times.
+        for _ in 1..8 {
+            let deployment_status = get_watcher_deployment(k8s_client, watcher_id).await?;
+            // .map_err(|_| warp::reject::custom(InternalError));
+            if deployment_status.get_watcher_status() == Status::Ready {
+                break;
+            }
+            thread::sleep(retry_sleep);
+        }
+
+        let _ = start_watcher(k8s_client, watcher_id).await?;
+    }
+
+    Ok(())
 }
