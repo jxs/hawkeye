@@ -9,7 +9,7 @@ use crate::actions::{ActionExecutor, Executors};
 use crate::config::AppConfig;
 use crate::img_detector::SlateDetector;
 use crate::metrics::run_metrics_service;
-use crate::video_stream::{process_frames, RtpServer};
+use crate::video_stream::{process_frames, VideoStream};
 use color_eyre::Result;
 use crossbeam::channel::unbounded;
 use gstreamer as gst;
@@ -72,15 +72,15 @@ fn main() -> Result<()> {
     .expect("Error setting termination handler");
 
     let detector = SlateDetector::new(&slate::load_img(watcher.slate_url.as_str())?)?;
-    log::info!(
-        "Starting pipeline at rtp://0.0.0.0:{}",
-        watcher.source.ingest_port
-    );
 
-    let server = RtpServer::new(
+    let server = VideoStream::new(
         watcher.source.ingest_port,
         watcher.source.container,
         watcher.source.codec,
+    ).expect("Could not start video stream");
+    log::info!(
+        "Starting pipeline at rtp://0.0.0.0:{}",
+        watcher.source.ingest_port
     );
 
     process_frames(server.into_iter(), detector, running, sender)

@@ -181,7 +181,7 @@ impl FrameCapture {
             self.frame_size.0,
             self.frame_size.1
         );
-        for frame in VideoStream::new(pipeline) {
+        for frame in VideoStream::new_from_description(pipeline)? {
             match frame? {
                 Some(contents) => return Ok(contents),
                 None => continue,
