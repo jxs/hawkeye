@@ -245,13 +245,13 @@ mod tests {
         );
         executor.execute(&VideoMode::Content);
         // Didn't call since it was the first state found
-        assert_eq!(called.load(Ordering::SeqCst), false);
+        assert!(!called.load(Ordering::SeqCst));
 
         executor.execute(&VideoMode::Slate {
             url: slate_url_filename,
         });
         // Must be called since we had a state transition that matches what we defined in the executor
-        assert_eq!(called.load(Ordering::SeqCst), true);
+        assert!(called.load(Ordering::SeqCst));
     }
 
     #[test]
@@ -276,14 +276,14 @@ mod tests {
             url: slate_url_filename.to_owned(),
         });
         // Must be called since we had a state transition that matches what we defined in the executor
-        assert_eq!(called.load(Ordering::SeqCst), true);
+        assert!(called.load(Ordering::SeqCst));
         // Reset state of our mock to "not called"
         called.store(false, Ordering::SeqCst);
         executor.execute(&VideoMode::Content);
         executor.execute(&VideoMode::Slate {
             url: slate_url_filename.to_owned(),
         });
-        assert_eq!(called.load(Ordering::SeqCst), false);
+        assert!(!called.load(Ordering::SeqCst));
     }
 
     #[test]
@@ -308,7 +308,7 @@ mod tests {
             url: slate_url_filename.to_owned(),
         });
         // Must be called since we had a state transition that matches what we defined in the executor
-        assert_eq!(called.load(Ordering::SeqCst), true);
+        assert!(called.load(Ordering::SeqCst));
         // Reset state of our mock to "not called"
         called.store(false, Ordering::SeqCst);
 
@@ -319,7 +319,7 @@ mod tests {
         executor.execute(&VideoMode::Slate {
             url: slate_url_filename.to_owned(),
         });
-        assert_eq!(called.load(Ordering::SeqCst), true);
+        assert!(called.load(Ordering::SeqCst));
     }
 
     #[test]
@@ -344,7 +344,7 @@ mod tests {
             url: slate_url_filename.to_owned(),
         });
         // Must be called since we had a state transition that matches what we defined in the executor
-        assert_eq!(called.load(Ordering::SeqCst), true);
+        assert!(called.load(Ordering::SeqCst));
         // Reset state of our mock to "not called"
         called.store(false, Ordering::SeqCst);
 
@@ -354,7 +354,7 @@ mod tests {
         executor.execute(&VideoMode::Slate {
             url: slate_url_filename.to_owned(),
         });
-        assert_eq!(called.load(Ordering::SeqCst), false);
+        assert!(!called.load(Ordering::SeqCst));
     }
 
     #[test]
@@ -376,7 +376,7 @@ mod tests {
         );
         // Prepare executor to be ready in the next call with `VideoMode::Slate`
         executor.execute(&VideoMode::Content);
-        assert_eq!(called.load(Ordering::SeqCst), false);
+        assert!(!called.load(Ordering::SeqCst));
 
         let (s, r) = unbounded();
         // Pile up some events for the runtime to consume
@@ -395,7 +395,7 @@ mod tests {
         runtime.run_blocking().expect("Should run successfully!");
 
         // Check the action was called
-        assert_eq!(called.load(Ordering::SeqCst), true);
+        assert!(called.load(Ordering::SeqCst));
     }
 
     #[test]
