@@ -4,7 +4,7 @@ use crate::metrics::{
     SIMILARITY_EXECUTION_COUNTER, SIMILARITY_EXECUTION_DURATION,
 };
 use crate::slate::SLATE_SIZE;
-use color_eyre::Result;
+use color_eyre::eyre::{bail, eyre, Context, Result};
 use concread::CowCell;
 use crossbeam::channel::{bounded, Receiver, Sender, TryRecvError, TrySendError};
 use derive_more::{Display, Error};
@@ -139,90 +139,64 @@ pub fn process_frames(
     Ok(())
 }
 
-pub struct RtpServer {
-    ingest_port: u32,
-    container: Container,
-    codec: Codec,
+/// A structure that encapsulates the Gstreamer pipeline video stream.
+pub struct VideoStream {
+    bus: gst::Bus,
+    receiver: Receiver<Result<Option<Vec<u8>>>>,
+    pipeline_description: String,
+    pipeline: gst::Pipeline,
 }
 
-impl RtpServer {
-    pub fn new(ingest_port: u32, container: Container, codec: Codec) -> Self {
-        Self {
-            ingest_port,
-            container,
-            codec,
-        }
-    }
-}
-
-impl IntoIterator for RtpServer {
-    type Item = Result<Option<Vec<u8>>>;
-    type IntoIter = VideoStreamIterator;
-
-    fn into_iter(self) -> Self::IntoIter {
+impl VideoStream {
+    /// Create a new Gstreamer RTP server pipeline.
+    pub fn new(ingest_port: u32, container: Container, codec: Codec) -> Result<Self> {
         let (width, height) = SLATE_SIZE;
-        let pipeline_description = match (self.container, self.codec) {
+        let pipeline_description = match (container, codec) {
             (Container::MpegTs, Codec::H264) => format!(
                 "udpsrc port={} caps=\"application/x-rtp, media=(string)video, clock-rate=(int)90000, encoding-name=(string)MP2T, payload=(int)33\" ! .recv_rtp_sink_0 rtpbin ! rtpmp2tdepay ! tsdemux ! h264parse ! avdec_h264 ! videorate ! video/x-raw,framerate=10/1 ! videoconvert ! videoscale ! capsfilter caps=\"video/x-raw, width={}, height={}\"",
-                self.ingest_port,
+                ingest_port,
                 width,
                 height
             ),
             (Container::RawVideo, Codec::H264) => format!(
                 "udpsrc port={} caps=\"application/x-rtp, media=(string)video, clock-rate=(int)90000, encoding-name=(string)H264, payload=(int)96\" ! rtph264depay ! decodebin ! videorate ! video/x-raw,framerate=10/1 ! videoconvert ! videoscale ! capsfilter caps=\"video/x-raw, width={}, height={}\"",
-                self.ingest_port,
+                ingest_port,
                 width,
                 height
             ),
-            (_, _) => {
-                panic!("Container ({:?}) and Codec ({:?}) not available", self.container, self.codec);
-            }
+            _ => bail!("Container ({:?}) and Codec ({:?}) not available", container, codec)
         };
-        VideoStream::new(pipeline_description).into_iter()
+
+        Self::new_from_description(pipeline_description)
     }
-}
 
-pub struct VideoStream {
-    pipeline_description: String,
-}
-
-impl VideoStream {
-    pub fn new<S: AsRef<str>>(pipeline_description: S) -> Self {
-        Self {
-            pipeline_description: String::from(pipeline_description.as_ref()),
-        }
-    }
-}
-
-impl IntoIterator for VideoStream {
-    type Item = Result<Option<Vec<u8>>>;
-    type IntoIter = VideoStreamIterator;
-
-    fn into_iter(self) -> Self::IntoIter {
+    /// Create a new Gstreamer pipeline from a given description.
+    pub fn new_from_description<S: AsRef<str>>(pipeline_description: S) -> Result<Self> {
         let (sender, receiver) = bounded(1);
+        let pipeline_description = pipeline_description.as_ref().into();
 
         debug!("Creating GStreamer Pipeline..");
         let pipeline = gst::parse_launch(
             format!(
                 "{} ! pngenc snapshot=false ! appsink name=sink",
-                self.pipeline_description
+                pipeline_description
             )
             .as_str(),
         )
-        .expect("Pipeline description invalid, cannot create")
+        .context("Pipeline description invalid, cannot create")?
         .downcast::<gst::Pipeline>()
-        .expect("Expected a gst::Pipeline");
+        .map_err(|_| eyre!("Expected a gst::Pipeline"))?;
 
         // Get access to the appsink element.
         let appsink = pipeline
             .by_name("sink")
-            .expect("Sink element not found")
+            .ok_or_else(|| eyre!("Sink element not found"))?
             .downcast::<gst_app::AppSink>()
-            .expect("Sink element is expected to be an appsink!");
+            .map_err(|_| eyre!("Sink element is expected to be an appsink!"))?;
 
         appsink
             .set_property("sync", &false)
-            .expect("Failed to disable gst pipeline sync");
+            .context("Failed to disable gst pipeline sync")?;
         appsink.set_callbacks(
             gst_app::AppSinkCallbacks::builder()
                 .new_sample(move |appsink| {
@@ -285,30 +259,23 @@ impl IntoIterator for VideoStream {
 
         let bus = pipeline
             .bus()
-            .expect("Pipeline without bus. Shouldn't happen!");
+            .ok_or_else(|| eyre!("Pipeline without bus. Shouldn't happen!"))?;
 
         pipeline
             .set_state(gst::State::Playing)
-            .expect("Cannot start pipeline");
-        info!("Pipeline started: {}", self.pipeline_description);
+            .context("Cannot start pipeline")?;
+        info!("Pipeline started: {}", pipeline_description);
 
-        VideoStreamIterator {
-            description: self.pipeline_description,
-            receiver,
-            pipeline,
+        Ok(Self {
             bus,
-        }
+            pipeline,
+            pipeline_description,
+            receiver,
+        })
     }
 }
 
-pub struct VideoStreamIterator {
-    description: String,
-    receiver: Receiver<Result<Option<Vec<u8>>>>,
-    pipeline: gst::Pipeline,
-    bus: gst::Bus,
-}
-
-impl Iterator for VideoStreamIterator {
+impl Iterator for VideoStream {
     type Item = Result<Option<Vec<u8>>>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -345,7 +312,10 @@ impl Iterator for VideoStreamIterator {
                 }
             }
             Err(TryRecvError::Disconnected) => {
-                log::debug!("The Pipeline channel is disconnected: {}", self.description);
+                log::debug!(
+                    "The Pipeline channel is disconnected: {}",
+                    self.pipeline_description
+                );
                 return None;
             }
         }
@@ -355,12 +325,12 @@ impl Iterator for VideoStreamIterator {
     }
 }
 
-impl Drop for VideoStreamIterator {
+impl Drop for VideoStream {
     fn drop(&mut self) {
-        if self.pipeline.set_state(gst::State::Null).is_err() {
-            log::error!("Could not stop pipeline");
+        match self.pipeline.set_state(gst::State::Null) {
+            Ok(_) => log::debug!("Pipeline stopped!"),
+            Err(err) => log::error!("Could not stop pipeline: {}", err),
         }
-        log::debug!("Pipeline stopped!");
     }
 }
 

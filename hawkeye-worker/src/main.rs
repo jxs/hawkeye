@@ -9,7 +9,7 @@ use crate::actions::{ActionExecutor, Executors};
 use crate::config::AppConfig;
 use crate::img_detector::{Slate, SlateDetector};
 use crate::metrics::run_metrics_service;
-use crate::video_stream::{process_frames, RtpServer};
+use crate::video_stream::{process_frames, VideoStream};
 use color_eyre::Result;
 use crossbeam::channel::unbounded;
 use gstreamer as gst;
@@ -100,18 +100,18 @@ fn main() -> Result<()> {
     let slate_detector = SlateDetector::new(to_slates)?;
 
     // Configure the video stream for the Watcher to "watch" for slates of interest.
+    let server = VideoStream::new(
+        watcher.source.ingest_port,
+        watcher.source.container,
+        watcher.source.codec,
+    )
+    .expect("Could not start video stream");
     log::info!(
         "Starting pipeline at rtp://0.0.0.0:{}",
         watcher.source.ingest_port
     );
 
-    let server = RtpServer::new(
-        watcher.source.ingest_port,
-        watcher.source.container,
-        watcher.source.codec,
-    );
-
     // Process frames from a streaming video server, using a SlateDetector to eventually dispatch
     // Actions to an action sink (sender).
-    process_frames(server.into_iter(), &slate_detector, running, sender)
+    process_frames(server, &slate_detector, running, sender)
 }
